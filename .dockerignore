@@ -1,0 +1,78 @@
+# Keep build context lean and prevent secret leaks into image layers.
+
+# Version control
+.git
+.gitignore
+.github
+.gitattributes
+
+# Compiled artifacts (Dockerfile recompiles from source)
+bin/
+**/*.exe
+**/*.dll
+**/*.so
+**/*.dylib
+
+# Secrets — must NEVER end up in an image layer
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+*.pem
+*.key
+*.crt
+*-credentials.json
+*serviceAccount*.json
+
+# IDE / editor / OS
+.idea/
+.vscode/
+**/.idea/
+**/.vscode/
+**/*.swp
+**/*.swo
+**/*~
+.DS_Store
+Thumbs.db
+**/.DS_Store
+**/Thumbs.db
+
+# Logs
+**/*.log
+
+# Local databases
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# User uploads (runtime data, mounted as volume in prod)
+uploads/*
+!uploads/.gitkeep
+
+# Frontend (separate app)
+frontend/
+rabhana_frontend/
+**/node_modules/
+package.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Test output
+**/*.test
+**/*.out
+**/coverage.html
+**/coverage.out
+
+# Go vendor (modules downloaded in builder stage)
+vendor/
+**/vendor/
+
+# Deployment config not needed inside the container
+docker-compose*.yml
+Makefile
+
+# Documentation
+*.md
+docs/

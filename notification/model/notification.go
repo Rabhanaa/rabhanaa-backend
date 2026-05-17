@@ -1,0 +1,52 @@
+package model
+
+type EventType string
+
+const (
+	EventNewBid             EventType = "new_bid"
+	EventAuctionEnded       EventType = "auction_ended"
+	EventAuctionEndedNoBids EventType = "auction_ended_no_bids"
+	EventBidSelected        EventType = "bid_selected"
+	EventOrderCreated       EventType = "order_created"
+	EventOrderConfirmed     EventType = "order_confirmed"
+	EventSelectionExpiring  EventType = "selection_expiring"
+	EventAccountApproved    EventType = "account_approved"
+	EventAccountRejected    EventType = "account_rejected"
+
+	EventNewSellAuction       EventType = "new_sell_auction"
+	EventNewBuyRequest        EventType = "new_buy_request"
+	EventNewOffer             EventType = "new_offer"
+	EventWinnerSelected       EventType = "winner_selected"
+	EventOfferAccepted        EventType = "offer_accepted"
+	EventBidNotSelected       EventType = "bid_not_selected"
+	EventOfferNotAccepted     EventType = "offer_not_accepted"
+	EventRequestEnded         EventType = "request_ended"
+	EventRequestEndedNoOffers EventType = "request_ended_no_offers"
+	EventSelectionExpired     EventType = "selection_expired"
+	EventOrderCompleted       EventType = "order_completed"
+	EventOrderExpired         EventType = "order_expired"
+)
+
+var NotificationMessages = map[EventType]struct{ Title, Body string }{
+	EventNewBid:               {"عرض جديد", "عرض جديد على مزادك"},
+	EventAuctionEnded:         {"انتهى المزاد", "انتهى المزاد - اختر الفائز خلال 24 ساعة"},
+	EventAuctionEndedNoBids:   {"انتهى المزاد", "انتهى المزاد بدون عروض"},
+	EventBidSelected:          {"مبروك!", "تم اختيارك كفائز!"},
+	EventOrderCreated:         {"طلب جديد", "تم إنشاء طلب جديد"},
+	EventOrderConfirmed:       {"تأكيد الطلب", "الطرف الآخر أكد الطلب"},
+	EventSelectionExpiring:    {"تنبيه", "باقي ساعة لاختيار الفائز"},
+	EventAccountApproved:      {"تم التفعيل", "تم تفعيل حسابك"},
+	EventAccountRejected:      {"تم الرفض", "تم رفض حسابك"},
+	EventNewSellAuction:       {"مزاد جديد", ""},
+	EventNewBuyRequest:        {"طلب شراء جديد", ""},
+	EventNewOffer:             {"عرض جديد", "عرض جديد على طلبك"},
+	EventWinnerSelected:       {"مبروك!", "تم اختيارك كفائز!"},
+	EventOfferAccepted:        {"تم القبول", "تم قبول عرضك"},
+	EventBidNotSelected:       {"للأسف لم يتم اختيارك", "تم اختيار عرض آخر على المزاد"},
+	EventOfferNotAccepted:     {"للأسف لم يتم قبول عرضك", "تم قبول عرض آخر على الطلب"},
+	EventRequestEnded:         {"انتهى الطلب", "انتهى الطلب - اختر المورد خلال 24 ساعة"},
+	EventRequestEndedNoOffers: {"انتهى الطلب", "انتهى الطلب بدون عروض"},
+	EventSelectionExpired:     {"انتهت فترة الاختيار", "انتهت مهلة الاختيار وتم إلغاء المزاد"},
+	EventOrderCompleted:       {"اكتمال الطلب", "تم تأكيد الطلب من الطرفين وهو جاهز للتنفيذ"},
+	EventOrderExpired:         {"انتهاء مهلة الطلب", "انتهت مهلة تأكيد الطلب (30 دقيقة) وتم إلغاؤه"},
+}

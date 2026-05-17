@@ -1,0 +1,1524 @@
+{
+  "info": {
+    "_postman_id": "7a1f0e2b-4c8a-4b3d-9f7d-rabhana-api-v1",
+    "name": "Rabhana API",
+    "description": "Generated from api/http/routes.go.\n\nVariables:\n- baseUrl: e.g. http://localhost:8080\n- token: JWT access token returned by /auth/login or /auth/verify-otp\n\nAuth: Bearer token on the collection. Public endpoints override to noauth.\n\nGroup prefixes:\n- /api/v1 — public + protected\n- /api/v1/admin — admin-only (JWT + admin claim)\n\nMiddleware tiers:\n- Public: no auth\n- Auth-only: JWT required (banned/suspended users allowed) — currently only /auth/logout\n- Protected: JWT + account status (active) — most endpoints\n- Admin: protected + isAdmin claim",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "token", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness probe. No auth."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth — Public",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+201000000000\",\n  \"region_id\": 1,\n  \"job_id\": 1,\n  \"password\": \"Pass1234\",\n  \"signup_source\": \"web\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "Create a new user. Password 8–16 chars. signup_source optional."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"Pass1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Returns { access_token, user }. Save access_token into the {{token}} collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Get OTP",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+201000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/get-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "get-otp"]
+            },
+            "description": "Request an OTP code via SMS."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+201000000000\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/verify-otp",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "verify-otp"]
+            },
+            "description": "Verify OTP, returns { access_token, user }."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reference (Public)",
+      "item": [
+        {
+          "name": "List regions",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/regions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "regions"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List interests",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/interests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "interests"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List jobs",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/jobs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "jobs"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth — Authenticated",
+      "item": [
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            },
+            "description": "JWT required. Allowed even for suspended/banned accounts."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile & Account",
+      "item": [
+        {
+          "name": "Get me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit documents",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "business_license", "type": "file", "src": [] },
+                { "key": "national_id", "type": "file", "src": [] },
+                { "key": "tax_card", "type": "file", "src": [] }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "documents"]
+            },
+            "description": "multipart/form-data. All three files required."
+          },
+          "response": []
+        },
+        {
+          "name": "Get documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "documents"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": 1,\n  \"region_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update interests",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"interest_ids\": [1, 2, 3]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/interests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "interests"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"Pass1234\",\n  \"new_password\": \"NewPass1234\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "change-password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update location",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 30.0444,\n  \"longitude\": 31.2357\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/location",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "location"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Upload",
+      "item": [
+        {
+          "name": "Upload file",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": [] }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "upload"]
+            },
+            "description": "multipart/form-data with field 'file'. Returns { url }."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Config",
+      "item": [
+        {
+          "name": "Get config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "config"]
+            },
+            "description": "Returns server-side limits and units."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sell Auctions",
+      "item": [
+        {
+          "name": "Create sell auction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"interest_id\": 1,\n  \"region_id\": 1,\n  \"title\": \"100 boxes of tomatoes\",\n  \"description\": \"Fresh, premium grade\",\n  \"image_url\": \"https://example.com/img.jpg\",\n  \"unit\": \"box\",\n  \"quantity\": 100,\n  \"unit_price\": 50.0,\n  \"buy_all_from_one\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions"]
+            },
+            "description": "unit ∈ { kg, ton, piece, box }"
+          },
+          "response": []
+        },
+        {
+          "name": "List active sell auctions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions?page=1&page_size=20&interest_id=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" },
+                { "key": "interest_id", "value": "1", "description": "optional" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search sell auctions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions/search?q=tomatoes&page=1&page_size=20&interest_id=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions", "search"],
+              "query": [
+                { "key": "q", "value": "tomatoes", "description": "required" },
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" },
+                { "key": "interest_id", "value": "1", "description": "optional" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List my sell auctions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions/mine?page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions", "mine"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get sell auction detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions", ":id"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "auction public UUID" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel sell auction",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions/:id/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions", ":id", "cancel"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Buy Requests",
+      "item": [
+        {
+          "name": "Create buy request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"interest_id\": 1,\n  \"region_id\": 1,\n  \"title\": \"Need 500kg of rice\",\n  \"description\": \"Long-grain, grade A\",\n  \"image_url\": \"https://example.com/img.jpg\",\n  \"unit\": \"kg\",\n  \"quantity\": 500,\n  \"buy_all_from_one\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List active buy requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests?page=1&page_size=20&interest_id=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" },
+                { "key": "interest_id", "value": "1", "description": "optional" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Search buy requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests/search?q=rice&page=1&page_size=20&interest_id=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests", "search"],
+              "query": [
+                { "key": "q", "value": "rice", "description": "required" },
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" },
+                { "key": "interest_id", "value": "1", "description": "optional" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List my buy requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests/mine?page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests", "mine"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get buy request detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests", ":id"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "buy request public UUID" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel buy request",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests/:id/cancel",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests", ":id", "cancel"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sell Bids",
+      "item": [
+        {
+          "name": "List bids by auction",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions/:id/bids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions", ":id", "bids"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "auction public UUID" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Place sell bid",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 45.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions/:id/bids",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions", ":id", "bids"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            },
+            "description": "Bid amount must be ≥ 85% of unit_price (bid floor)."
+          },
+          "response": []
+        },
+        {
+          "name": "List my sell bids",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/my-bids/sell?page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "my-bids", "sell"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Bids",
+      "item": [
+        {
+          "name": "Get active bid count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/user-bids/active-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "user-bids", "active-count"]
+            },
+            "description": "Sum of active sell-bids and supply offers for the current user."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Supply Offers",
+      "item": [
+        {
+          "name": "List offers by buy request",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests/:id/offers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests", ":id", "offers"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Place supply offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price_per_unit\": 12.5,\n  \"offered_quantity\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests/:id/offers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests", ":id", "offers"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            },
+            "description": "offered_quantity optional (omitting implies full quantity)."
+          },
+          "response": []
+        },
+        {
+          "name": "List my supply offers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/my-bids/supply?page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "my-bids", "supply"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Selections",
+      "item": [
+        {
+          "name": "Select sell auction winner",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bid_public_id\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sell-auctions/:id/select",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sell-auctions", ":id", "select"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "auction public UUID" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Accept supply offer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offer_public_id\": \"00000000-0000-0000-0000-000000000000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/buy-requests/:id/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "buy-requests", ":id", "accept"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "buy request public UUID" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "List my orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"]
+            },
+            "description": "Note: pagination is currently hardcoded to page=1, size=20 server-side."
+          },
+          "response": []
+        },
+        {
+          "name": "Get order detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":id"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "order public UUID" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm order",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders/:id/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders", ":id", "confirm"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications"],
+              "query": [
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark as read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/:id/read",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", ":id", "read"],
+              "variable": [
+                { "key": "id", "value": "1", "description": "notification numeric ID" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark all as read",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "read-all"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register device token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fcm-device-token\",\n  \"platform\": \"mobile\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/device-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "device-token"]
+            },
+            "description": "platform ∈ { web, mobile }"
+          },
+          "response": []
+        },
+        {
+          "name": "Deregister device token",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fcm-device-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/device-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "notifications", "device-token"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Issues",
+      "item": [
+        {
+          "name": "Create issue",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Cannot place bid\",\n  \"description\": \"Getting 500 when bidding on auction X\",\n  \"category\": \"problem\",\n  \"priority\": \"normal\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issues",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issues"]
+            },
+            "description": "category ∈ { inquiry, support, problem, suggestion } (default: support). priority ∈ { low, normal, high, urgent } (default: normal). Max 3 open issues per user."
+          },
+          "response": []
+        },
+        {
+          "name": "List my issues",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issues?page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issues"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get issue detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/issues/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "issues", ":id"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "issue public UUID" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Subscription",
+      "item": [
+        {
+          "name": "Get my subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscription"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get subscription status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscription/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscription", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List subscription tiers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscription/tiers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscription", "tiers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get my referral code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscription/my-referral",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscription", "my-referral"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Apply referral code",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"REF-ABC123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/subscription/apply-referral",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "subscription", "apply-referral"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Users",
+      "item": [
+        {
+          "name": "List pending users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/pending?page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", "pending"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List all users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users?status=&q=&page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users"],
+              "query": [
+                { "key": "status", "value": "", "description": "optional: pending, active, suspended, banned, rejected" },
+                { "key": "q", "value": "", "description": "optional: free-text search" },
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000", "description": "user public UUID" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve user",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "approve"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject user",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Documents do not match name on file\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "reject"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Suspend user",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Spam reports under review\",\n  \"duration_hours\": 24\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/suspend",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "suspend"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            },
+            "description": "duration_hours optional (1–8760)."
+          },
+          "response": []
+        },
+        {
+          "name": "Unsuspend user",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/unsuspend",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "unsuspend"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ban user",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Repeated violations\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/ban",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "ban"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unban user",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/unban",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "unban"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get user documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "documents"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            },
+            "description": "Returns presigned URLs (1 hour TTL)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Subscriptions",
+      "item": [
+        {
+          "name": "List user subscriptions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/subscriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "subscriptions"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Grant subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tier_name\": \"pro\",\n  \"started_at\": \"2026-05-18T00:00:00Z\",\n  \"expires_at\": \"2026-06-18T00:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/subscription",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "subscription"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            },
+            "description": "started_at defaults to now; expires_at defaults to started_at + 1 month."
+          },
+          "response": []
+        },
+        {
+          "name": "Update subscription",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"started_at\": \"2026-05-18T00:00:00Z\",\n  \"expires_at\": \"2026-07-18T00:00:00Z\",\n  \"is_active\": true,\n  \"is_primary\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/users/:id/subscription/:sub_id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "users", ":id", "subscription", ":sub_id"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" },
+                { "key": "sub_id", "value": "1", "description": "subscription numeric ID" }
+              ]
+            },
+            "description": "All body fields optional."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Issues",
+      "item": [
+        {
+          "name": "List all issues",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/issues?page=1&page_size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "issues"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "page_size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get issue detail (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/issues/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "issues", ":id"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Close issue",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/issues/:id/close",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "issues", ":id", "close"],
+              "variable": [
+                { "key": "id", "value": "00000000-0000-0000-0000-000000000000" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin — Analytics",
+      "item": [
+        {
+          "name": "Overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/overview?from=2026-04-18T00:00:00Z&to=2026-05-18T00:00:00Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "overview"],
+              "query": [
+                { "key": "from", "value": "2026-04-18T00:00:00Z", "description": "RFC3339, optional (defaults to last 30 days)" },
+                { "key": "to", "value": "2026-05-18T00:00:00Z", "description": "RFC3339, optional" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Time series",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/timeseries?metric=new_users&granularity=day&from=2026-04-18T00:00:00Z&to=2026-05-18T00:00:00Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "timeseries"],
+              "query": [
+                { "key": "metric", "value": "new_users", "description": "required: new_users | failed_logins | bids | closed_auctions | orders | buy_requests | issues" },
+                { "key": "granularity", "value": "day", "description": "day | week | month (default day)" },
+                { "key": "from", "value": "2026-04-18T00:00:00Z" },
+                { "key": "to", "value": "2026-05-18T00:00:00Z" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Users status distribution",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/users/status-distribution",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "users", "status-distribution"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Users source distribution",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/users/source-distribution?from=2026-04-18T00:00:00Z&to=2026-05-18T00:00:00Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "users", "source-distribution"],
+              "query": [
+                { "key": "from", "value": "2026-04-18T00:00:00Z" },
+                { "key": "to", "value": "2026-05-18T00:00:00Z" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Users source by day",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/users/source-by-day?from=2026-04-18T00:00:00Z&to=2026-05-18T00:00:00Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "users", "source-by-day"],
+              "query": [
+                { "key": "from", "value": "2026-04-18T00:00:00Z" },
+                { "key": "to", "value": "2026-05-18T00:00:00Z" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Issues breakdown",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/issues/breakdown?from=2026-04-18T00:00:00Z&to=2026-05-18T00:00:00Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "issues", "breakdown"],
+              "query": [
+                { "key": "from", "value": "2026-04-18T00:00:00Z" },
+                { "key": "to", "value": "2026-05-18T00:00:00Z" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Subscription stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/subscriptions/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "subscriptions", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Users by interest (counts)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/users/by-interest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "users", "by-interest"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Users by interest (detail)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/analytics/users/by-interest/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "analytics", "users", "by-interest", ":id"],
+              "variable": [
+                { "key": "id", "value": "1", "description": "interest numeric ID (positive integer)" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
