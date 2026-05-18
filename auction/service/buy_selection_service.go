@@ -150,7 +150,7 @@ func (s *BuySelectionService) AcceptOffer(ctx context.Context, ownerID int32, re
 		return fmt.Errorf("failed to get buyer data: %w", err)
 	}
 
-	_, err = s.orderRepo.CreateFromBuyRequest(ctx, sqlc.CreateOrderFromBuyRequestParams{
+	order, err := s.orderRepo.CreateFromBuyRequest(ctx, sqlc.CreateOrderFromBuyRequestParams{
 		BuyRequestID:   pgtype.Int4{Int32: request.ID, Valid: true},
 		SellerID:       offer.SupplierID,
 		BuyerID:        request.OwnerID,
@@ -171,10 +171,12 @@ func (s *BuySelectionService) AcceptOffer(ctx context.Context, ownerID int32, re
 
 	s.notificationSender.Send(ctx, offer.SupplierID, notifModel.EventOfferAccepted, map[string]string{
 		"request_id": request.PublicID.String(),
+		"order_id":   order.PublicID.String(),
 	})
 
 	s.notificationSender.Send(ctx, request.OwnerID, notifModel.EventOrderCreated, map[string]string{
 		"request_id": request.PublicID.String(),
+		"order_id":   order.PublicID.String(),
 	})
 
 	wasFullyFulfilled := newFulfilled >= requestQty

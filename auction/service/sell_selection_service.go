@@ -112,7 +112,7 @@ func (s *SellSelectionService) SelectWinner(ctx context.Context, ownerID int32, 
 		return fmt.Errorf("failed to get buyer data: %w", err)
 	}
 
-	_, err = s.orderRepo.CreateFromSellAuction(ctx, sqlc.CreateOrderFromSellAuctionParams{
+	order, err := s.orderRepo.CreateFromSellAuction(ctx, sqlc.CreateOrderFromSellAuctionParams{
 		SellAuctionID:  pgtype.Int4{Int32: auction.ID, Valid: true},
 		SellerID:       auction.OwnerID,
 		BuyerID:        bid.BidderID,
@@ -133,10 +133,12 @@ func (s *SellSelectionService) SelectWinner(ctx context.Context, ownerID int32, 
 
 	s.notificationSender.Send(ctx, bid.BidderID, notifModel.EventWinnerSelected, map[string]string{
 		"auction_id": auction.PublicID.String(),
+		"order_id":   order.PublicID.String(),
 	})
 
 	s.notificationSender.Send(ctx, auction.OwnerID, notifModel.EventOrderCreated, map[string]string{
 		"auction_id": auction.PublicID.String(),
+		"order_id":   order.PublicID.String(),
 	})
 
 	losers, err := s.bidRepo.GetLosingBidderIDs(ctx, auction.ID, bid.ID)
