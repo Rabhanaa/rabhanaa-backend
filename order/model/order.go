@@ -49,6 +49,7 @@ type OrderResponse struct {
 	BuyerRegion          string  `json:"buyer_region"`
 	FinalPrice           string  `json:"final_price"`
 	UnitPrice            string  `json:"unit_price"`
+	TotalPrice           string  `json:"total_price"`
 	Quantity             string  `json:"quantity"`
 	Unit                 string  `json:"unit"`
 	Status               string  `json:"status"`

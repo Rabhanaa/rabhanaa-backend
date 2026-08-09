@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 
 	"rabhana/auction/model"
@@ -159,7 +158,7 @@ func (s *SellBiddingService) PlaceBid(ctx context.Context, bidderID int32, aucti
 	_, err = s.bidRepo.Create(ctx, sqlc.CreateSellBidParams{
 		AuctionID:        auction.ID,
 		BidderID:         bidderID,
-		Amount:           pgtype.Numeric{Int: bidAmount.BigInt(), Valid: true},
+		Amount:           decimalToNumeric(bidAmount),
 		BidderRegionName: regionName,
 		BidderFakeName:   fakeName,
 		AuctionTitle:     auction.Title,

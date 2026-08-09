@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/shopspring/decimal"
 
 	"rabhana/auction/model"
@@ -181,8 +180,8 @@ func (s *SupplyOfferingService) PlaceOffer(ctx context.Context, supplierID int32
 	_, err = s.offerRepo.Create(ctx, sqlc.CreateSupplyOfferParams{
 		BuyRequestID:       request.ID,
 		SupplierID:         supplierID,
-		PricePerUnit:       pgtype.Numeric{Int: pricePerUnit.BigInt(), Valid: true},
-		OfferedQuantity:    pgtype.Numeric{Int: offeredQty.BigInt(), Valid: true},
+		PricePerUnit:       decimalToNumeric(pricePerUnit),
+		OfferedQuantity:    decimalToNumeric(offeredQty),
 		SupplierRegionName: regionName,
 		SupplierFakeName:   fakeName,
 		RequestTitle:       request.Title,

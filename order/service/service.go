@@ -224,14 +224,15 @@ func (s *OrderService) toResponse(order sqlc.Order, requestingUserID int32) *mod
 	finalPrice := numericToString(order.FinalPrice)
 	quantity := numericToString(order.Quantity)
 
-	unitPrice := "0"
-	if quantity != "0" {
-		decFinalPrice, _ := decimal.NewFromString(finalPrice)
-		decQuantity, _ := decimal.NewFromString(quantity)
-		if decQuantity.IsPositive() {
-			unitPriceDec := decFinalPrice.Div(decQuantity)
-			unitPrice = unitPriceDec.String()
-		}
+	// final_price holds the winning bid amount, which is a price *per unit* — the
+	// 85% floor is checked against the listing's unit_price. Dividing it by the
+	// quantity produced a nonsense unit price and hid the real deal value.
+	unitPrice := finalPrice
+	totalPrice := "0"
+	decFinalPrice, priceErr := decimal.NewFromString(finalPrice)
+	decQuantity, qtyErr := decimal.NewFromString(quantity)
+	if priceErr == nil && qtyErr == nil {
+		totalPrice = decFinalPrice.Mul(decQuantity).String()
 	}
 
 	var confirmationDeadline *string
@@ -278,6 +279,7 @@ func (s *OrderService) toResponse(order sqlc.Order, requestingUserID int32) *mod
 		BuyerRegion:          buyerRegion,
 		FinalPrice:           finalPrice,
 		UnitPrice:            unitPrice,
+		TotalPrice:           totalPrice,
 		Quantity:             quantity,
 		Unit:                 order.Unit,
 		Status:               order.Status,

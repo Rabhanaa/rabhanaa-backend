@@ -151,8 +151,8 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 		Description:   description,
 		ImageUrl:      imageURL,
 		Unit:          req.Unit,
-		Quantity:      pgtype.Numeric{Int: quantity.BigInt(), Valid: true},
-		UnitPrice:     pgtype.Numeric{Int: unitPrice.BigInt(), Valid: true},
+		Quantity:      decimalToNumeric(quantity),
+		UnitPrice:     decimalToNumeric(unitPrice),
 		BuyAllFromOne: buyAllFromOne,
 		EndTime:       pgtype.Timestamptz{Time: endTime, Valid: true},
 		OwnerName:     user.Name,
@@ -352,15 +352,4 @@ func (s *SellAuctionService) toResponse(auction sqlc.SellAuction, requestingUser
 		IsExpired:     auction.EndTime.Time.Before(time.Now()),
 		CreatedAt:     auction.CreatedAt.Time.Format(time.RFC3339),
 	}
-}
-
-func numericToString(n pgtype.Numeric) string {
-	if !n.Valid {
-		return "0"
-	}
-	if n.Int == nil {
-		return "0"
-	}
-	dec := decimal.NewFromBigInt(n.Int, n.Exp)
-	return dec.String()
 }
