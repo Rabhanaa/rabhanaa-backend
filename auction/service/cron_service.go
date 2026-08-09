@@ -169,7 +169,7 @@ func (c *CronService) processExpiredSelections(ctx context.Context) {
 			Status: "expired",
 		})
 		c.sellBidRepo.MarkNotChosen(ctx, auction.ID)
-		c.notificationSender.SendToUser(ctx, auction.OwnerID, "انتهت فترة الاختيار", "انتهت مهلة اختيار الفائز وتم إلغاء المزاد", map[string]string{
+		c.notificationSender.SendToUser(ctx, auction.OwnerID, "انتهت فترة الاختيار", "انتهت مهلة اختيار الفائز وتم إلغاء الصفقة", map[string]string{
 			"type":       "selection_expired",
 			"auction_id": auction.PublicID.String(),
 		})
@@ -283,7 +283,7 @@ func sellMotivation(interestName string, endTime time.Time) (string, string) {
 	case minsLeft >= 10:
 		return "⏰ الوقت ينفد", "باقي وقت قليل على " + interestName + "، انضم الآن"
 	default:
-		return "🚨 آخر فرصة!", "المزاد على " + interestName + " ينتهي قريباً"
+		return "🚨 آخر فرصة!", "الصفقة على " + interestName + " تنتهي قريباً"
 	}
 }
 
@@ -324,7 +324,7 @@ func (c *CronService) processNewListings(ctx context.Context) {
 		}
 
 		for _, userID := range matchingUsers {
-			c.notificationSender.SendToUser(ctx, userID, auction.InterestName+" - مزاد جديد", auction.Title, map[string]string{
+			c.notificationSender.SendToUser(ctx, userID, auction.InterestName+" - صفقة جديدة", auction.Title, map[string]string{
 				"type":       "new_sell_auction",
 				"auction_id": auction.PublicID.String(),
 			})

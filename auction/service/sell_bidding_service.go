@@ -152,7 +152,7 @@ func (s *SellBiddingService) PlaceBid(ctx context.Context, bidderID int32, aucti
 		regionName = region.NameAr
 	}
 
-	// Generate fake name for bidder (e.g., "مزاد1", "مزاد2", etc.)
+	// Generate fake name for bidder (e.g., "صفقة1", "صفقة2", etc.)
 	fakeName := generateFakeBidderName(auction.ID, int(auction.BidCount+1))
 
 	_, err = s.bidRepo.Create(ctx, sqlc.CreateSellBidParams{
@@ -251,5 +251,5 @@ func (s *SellBiddingService) ListBidsByAuction(ctx context.Context, auctionPubli
 
 // generateFakeBidderName generates a fake name for bidder anonymity
 func generateFakeBidderName(auctionID int32, bidNumber int) string {
-	return fmt.Sprintf("مزاد%d", bidNumber)
+	return fmt.Sprintf("صفقة%d", bidNumber)
 }

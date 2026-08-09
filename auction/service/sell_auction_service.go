@@ -173,7 +173,7 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 			slog.Error("broadcast sell auction: get interested users failed", "auction_id", auctionID, "error", err)
 			return
 		}
-		title := interestNameAr + " - مزاد جديد"
+		title := interestNameAr + " - صفقة جديدة"
 		for _, uid := range users {
 			s.notificationSender.SendToUser(bgCtx, uid, title, auctionTitle, map[string]string{
 				"type":       "new_sell_auction",
