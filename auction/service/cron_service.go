@@ -26,6 +26,7 @@ type CronService struct {
 	seedService        *SeedService
 	notificationSender NotificationSender
 	queries            *sqlc.Queries
+	selectionWindow    int32
 	ticker             *time.Ticker
 	done               chan bool
 }
@@ -40,6 +41,7 @@ func NewCronService(
 	notificationSender NotificationSender,
 	seedService *SeedService,
 	queries *sqlc.Queries,
+	selectionWindowHours int,
 ) *CronService {
 	return &CronService{
 		sellAuctionRepo:    sellRepo,
@@ -51,6 +53,7 @@ func NewCronService(
 		notificationSender: notificationSender,
 		seedService:        seedService,
 		queries:            queries,
+		selectionWindow:    int32(selectionWindowHours),
 	}
 }
 
@@ -159,7 +162,7 @@ func (c *CronService) processExpiredAuctions(ctx context.Context) {
 }
 
 func (c *CronService) processExpiredSelections(ctx context.Context) {
-	expiredSell, _ := c.sellAuctionRepo.GetExpiredPendingSelection(ctx)
+	expiredSell, _ := c.sellAuctionRepo.GetExpiredPendingSelection(ctx, c.selectionWindow)
 	for _, auction := range expiredSell {
 		c.sellAuctionRepo.UpdateStatus(ctx, sqlc.UpdateSellAuctionStatusParams{
 			ID:     auction.ID,
@@ -173,7 +176,7 @@ func (c *CronService) processExpiredSelections(ctx context.Context) {
 		slog.Info("sell auction selection expired", "auction_id", auction.PublicID)
 	}
 
-	expiredBuy, _ := c.buyRequestRepo.GetExpiredPendingSelection(ctx)
+	expiredBuy, _ := c.buyRequestRepo.GetExpiredPendingSelection(ctx, c.selectionWindow)
 	for _, request := range expiredBuy {
 		c.buyRequestRepo.UpdateStatus(ctx, sqlc.UpdateBuyRequestStatusParams{
 			ID:     request.ID,
@@ -195,20 +198,26 @@ func (c *CronService) processExpiredOrders(ctx context.Context) {
 }
 
 func (c *CronService) processSelectionWarnings(ctx context.Context) {
-	warningSell, _ := c.sellAuctionRepo.GetSoonExpiringSelection(ctx)
+	warningSell, _ := c.sellAuctionRepo.GetSoonExpiringSelection(ctx, c.selectionWindow)
 	for _, auction := range warningSell {
 		c.notificationSender.SendToUser(ctx, auction.OwnerID, "تنبيه", "باقي ساعة لاختيار الفائز", map[string]string{
 			"auction_id": auction.PublicID.String(),
 			"type":       "selection_expiring",
 		})
+		if err := c.sellAuctionRepo.MarkSelectionWarned(ctx, auction.ID); err != nil {
+			slog.Error("failed to mark sell auction selection warned", "error", err, "auction_id", auction.ID)
+		}
 	}
 
-	warningBuy, _ := c.buyRequestRepo.GetSoonExpiringSelection(ctx)
+	warningBuy, _ := c.buyRequestRepo.GetSoonExpiringSelection(ctx, c.selectionWindow)
 	for _, request := range warningBuy {
 		c.notificationSender.SendToUser(ctx, request.OwnerID, "تنبيه", "باقي ساعة لاختيار المورد", map[string]string{
 			"request_id": request.PublicID.String(),
 			"type":       "selection_expiring",
 		})
+		if err := c.buyRequestRepo.MarkSelectionWarned(ctx, request.ID); err != nil {
+			slog.Error("failed to mark buy request selection warned", "error", err, "request_id", request.ID)
+		}
 	}
 }
 

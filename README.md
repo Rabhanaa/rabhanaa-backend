@@ -67,7 +67,7 @@ docker run --env-file .env -p 8080:8080 rabhana-api
 
 | Variable                          | Default |
 |-----------------------------------|---------|
-| `AUCTION_DURATION_HOURS`          | `1`     |
+| `AUCTION_DURATION_HOURS`          | `24`    |
 | `MAX_BIDS_PER_AUCTION`            | `10`    |
 | `MAX_ACTIVE_BIDS_PER_USER`        | `3`     |
 | `SELECTION_WINDOW_HOURS`          | `24`    |

@@ -81,13 +81,19 @@ SELECT * FROM sell_auctions WHERE status = 'active' AND end_time <= NOW();
 
 -- name: GetExpiredPendingSelectionSellAuctions :many
 SELECT * FROM sell_auctions
-WHERE status = 'pending_selection' AND end_time + INTERVAL '1 hour' <= NOW();
+WHERE status = 'pending_selection'
+  AND end_time + (sqlc.arg(window_hours)::int * INTERVAL '1 hour') <= NOW();
 
 -- name: GetSoonExpiringSelectionSellAuctions :many
+-- Fires once, during the final hour before the selection deadline.
 SELECT * FROM sell_auctions
 WHERE status = 'pending_selection'
-  AND end_time + INTERVAL '50 minutes' <= NOW()
-  AND end_time + INTERVAL '1 hour' > NOW();
+  AND selection_warning_sent_at IS NULL
+  AND NOW() >= end_time + (sqlc.arg(window_hours)::int * INTERVAL '1 hour') - INTERVAL '1 hour'
+  AND NOW() <  end_time + (sqlc.arg(window_hours)::int * INTERVAL '1 hour');
+
+-- name: MarkSellAuctionSelectionWarned :exec
+UPDATE sell_auctions SET selection_warning_sent_at = NOW() WHERE id = $1;
 
 -- name: CountMonthlySellCancellations :one
 SELECT COUNT(*) FROM sell_auctions

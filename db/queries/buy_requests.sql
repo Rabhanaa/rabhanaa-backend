@@ -82,13 +82,19 @@ SELECT * FROM buy_requests WHERE status = 'active' AND end_time <= NOW();
 
 -- name: GetExpiredPendingSelectionBuyRequests :many
 SELECT * FROM buy_requests
-WHERE status = 'pending_selection' AND end_time + INTERVAL '1 hour' <= NOW();
+WHERE status = 'pending_selection'
+  AND end_time + (sqlc.arg(window_hours)::int * INTERVAL '1 hour') <= NOW();
 
 -- name: GetSoonExpiringSelectionBuyRequests :many
+-- Fires once, during the final hour before the selection deadline.
 SELECT * FROM buy_requests
 WHERE status = 'pending_selection'
-  AND end_time + INTERVAL '50 minutes' <= NOW()
-  AND end_time + INTERVAL '1 hour' > NOW();
+  AND selection_warning_sent_at IS NULL
+  AND NOW() >= end_time + (sqlc.arg(window_hours)::int * INTERVAL '1 hour') - INTERVAL '1 hour'
+  AND NOW() <  end_time + (sqlc.arg(window_hours)::int * INTERVAL '1 hour');
+
+-- name: MarkBuyRequestSelectionWarned :exec
+UPDATE buy_requests SET selection_warning_sent_at = NOW() WHERE id = $1;
 
 -- name: CountMonthlyBuyCancellations :one
 SELECT COUNT(*) FROM buy_requests

@@ -26,8 +26,9 @@ type BuyRequestRepository interface {
 	UpdateFulfilledQuantity(ctx context.Context, params sqlc.UpdateBuyRequestFulfilledQuantityParams) error
 	Cancel(ctx context.Context, id int32) error
 	GetExpiredActive(ctx context.Context) ([]sqlc.BuyRequest, error)
-	GetExpiredPendingSelection(ctx context.Context) ([]sqlc.BuyRequest, error)
-	GetSoonExpiringSelection(ctx context.Context) ([]sqlc.BuyRequest, error)
+	GetExpiredPendingSelection(ctx context.Context, windowHours int32) ([]sqlc.BuyRequest, error)
+	GetSoonExpiringSelection(ctx context.Context, windowHours int32) ([]sqlc.BuyRequest, error)
+	MarkSelectionWarned(ctx context.Context, id int32) error
 	CountMonthlyCancellations(ctx context.Context, ownerID int32) (int64, error)
 	RevertToPendingSelection(ctx context.Context, requestID int32) error
 }
@@ -113,12 +114,16 @@ func (r *buyRequestRepository) GetExpiredActive(ctx context.Context) ([]sqlc.Buy
 	return r.queries.GetExpiredActiveBuyRequests(ctx)
 }
 
-func (r *buyRequestRepository) GetExpiredPendingSelection(ctx context.Context) ([]sqlc.BuyRequest, error) {
-	return r.queries.GetExpiredPendingSelectionBuyRequests(ctx)
+func (r *buyRequestRepository) GetExpiredPendingSelection(ctx context.Context, windowHours int32) ([]sqlc.BuyRequest, error) {
+	return r.queries.GetExpiredPendingSelectionBuyRequests(ctx, windowHours)
 }
 
-func (r *buyRequestRepository) GetSoonExpiringSelection(ctx context.Context) ([]sqlc.BuyRequest, error) {
-	return r.queries.GetSoonExpiringSelectionBuyRequests(ctx)
+func (r *buyRequestRepository) GetSoonExpiringSelection(ctx context.Context, windowHours int32) ([]sqlc.BuyRequest, error) {
+	return r.queries.GetSoonExpiringSelectionBuyRequests(ctx, windowHours)
+}
+
+func (r *buyRequestRepository) MarkSelectionWarned(ctx context.Context, id int32) error {
+	return r.queries.MarkBuyRequestSelectionWarned(ctx, id)
 }
 
 func (r *buyRequestRepository) CountMonthlyCancellations(ctx context.Context, ownerID int32) (int64, error) {

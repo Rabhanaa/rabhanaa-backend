@@ -185,6 +185,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		notificationService,
 		seedService,
 		queries,
+		cfg.SelectionWindowHours,
 	)
 
 	return &AppContext{
@@ -244,10 +245,10 @@ func LoadAppConfig() *AppConfig {
 		ServerPort:               getEnv("SERVER_PORT", "8080"),
 		DatabaseURL:              getEnv("DATABASE_URL", "postgres://localhost:5432/rab?sslmode=disable"),
 		DatabaseTimeout:          getEnvAsInt("DATABASE_TIMEOUT_SECONDS", 10),
-		AuctionDurationHours:     getEnvAsInt("AUCTION_DURATION_HOURS", 1),
+		AuctionDurationHours:     getEnvAsInt("AUCTION_DURATION_HOURS", 24),
 		MaxBidsPerAuction:        getEnvAsInt("MAX_BIDS_PER_AUCTION", 10),
 		MaxActiveBidsPerUser:     getEnvAsInt("MAX_ACTIVE_BIDS_PER_USER", 3),
-		SelectionWindowHours:     getEnvAsInt("SELECTION_WINDOW_HOURS", 1),
+		SelectionWindowHours:     getEnvAsInt("SELECTION_WINDOW_HOURS", 24),
 		MaxCancellationsPerMonth: getEnvAsInt("MAX_CANCELLATIONS_PER_MONTH", 3),
 		MaxOpenIssuesPerUser:     getEnvAsInt("MAX_OPEN_ISSUES_PER_USER", 3),
 		MaxNotificationsPerUser:  getEnvAsInt("MAX_NOTIFICATIONS_PER_USER", 10),

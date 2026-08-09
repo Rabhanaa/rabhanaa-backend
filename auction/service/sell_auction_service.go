@@ -47,7 +47,7 @@ func NewSellAuctionService(
 ) *SellAuctionService {
 	duration := time.Duration(auctionDurationHours) * time.Hour
 	if duration == 0 {
-		duration = 1 * time.Hour
+		duration = 24 * time.Hour
 	}
 	return &SellAuctionService{
 		auctionRepo:        auctionRepo,

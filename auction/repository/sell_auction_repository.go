@@ -25,8 +25,9 @@ type SellAuctionRepository interface {
 	SelectWinner(ctx context.Context, params sqlc.SelectSellWinnerParams) error
 	Cancel(ctx context.Context, id int32) error
 	GetExpiredActive(ctx context.Context) ([]sqlc.SellAuction, error)
-	GetExpiredPendingSelection(ctx context.Context) ([]sqlc.SellAuction, error)
-	GetSoonExpiringSelection(ctx context.Context) ([]sqlc.SellAuction, error)
+	GetExpiredPendingSelection(ctx context.Context, windowHours int32) ([]sqlc.SellAuction, error)
+	GetSoonExpiringSelection(ctx context.Context, windowHours int32) ([]sqlc.SellAuction, error)
+	MarkSelectionWarned(ctx context.Context, id int32) error
 	CountMonthlyCancellations(ctx context.Context, ownerID int32) (int64, error)
 	RevertToPendingSelection(ctx context.Context, auctionID int32) error
 }
@@ -108,12 +109,16 @@ func (r *sellAuctionRepository) GetExpiredActive(ctx context.Context) ([]sqlc.Se
 	return r.queries.GetExpiredActiveSellAuctions(ctx)
 }
 
-func (r *sellAuctionRepository) GetExpiredPendingSelection(ctx context.Context) ([]sqlc.SellAuction, error) {
-	return r.queries.GetExpiredPendingSelectionSellAuctions(ctx)
+func (r *sellAuctionRepository) GetExpiredPendingSelection(ctx context.Context, windowHours int32) ([]sqlc.SellAuction, error) {
+	return r.queries.GetExpiredPendingSelectionSellAuctions(ctx, windowHours)
 }
 
-func (r *sellAuctionRepository) GetSoonExpiringSelection(ctx context.Context) ([]sqlc.SellAuction, error) {
-	return r.queries.GetSoonExpiringSelectionSellAuctions(ctx)
+func (r *sellAuctionRepository) GetSoonExpiringSelection(ctx context.Context, windowHours int32) ([]sqlc.SellAuction, error) {
+	return r.queries.GetSoonExpiringSelectionSellAuctions(ctx, windowHours)
+}
+
+func (r *sellAuctionRepository) MarkSelectionWarned(ctx context.Context, id int32) error {
+	return r.queries.MarkSellAuctionSelectionWarned(ctx, id)
 }
 
 func (r *sellAuctionRepository) CountMonthlyCancellations(ctx context.Context, ownerID int32) (int64, error) {
