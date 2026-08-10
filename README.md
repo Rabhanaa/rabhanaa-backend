@@ -74,6 +74,7 @@ docker run --env-file .env -p 8080:8080 rabhana-api
 | `MAX_CANCELLATIONS_PER_MONTH`     | `3`     |
 | `MIN_INTERESTS_AT_REGISTRATION`   | `5`     |
 | `MAX_NOTIFICATIONS_PER_USER`      | `10`    |
+| `SEED_ENABLED`                    | `true`  |
 
 ### Integrations (optional)
 

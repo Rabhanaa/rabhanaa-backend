@@ -3,6 +3,7 @@ package context
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"strconv"
 
@@ -170,7 +171,13 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		notificationService,
 	)
 
-	seedService := auctionSvcPkg.NewSeedService(queries, cfg.AuctionDurationHours, cfg.DefaultImageURL)
+	// Left nil when disabled — CronService already skips seeding on a nil service.
+	var seedService *auctionSvcPkg.SeedService
+	if cfg.SeedEnabled {
+		seedService = auctionSvcPkg.NewSeedService(queries, cfg.AuctionDurationHours, cfg.DefaultImageURL)
+	} else {
+		slog.Info("seeding disabled", "reason", "SEED_ENABLED=false")
+	}
 
 	analyticsRepo := analyticsRepoPkg.NewRepository(queries)
 	analyticsService := analyticsSvcPkg.NewAnalyticsService(analyticsRepo)
@@ -227,6 +234,7 @@ type AppConfig struct {
 	BidFloorPercentage       int
 	SupportPhone             string
 	DefaultImageURL          string
+	SeedEnabled              bool
 	FirebaseCredentialsPath  string
 	FirebaseCredentialsJSON  string
 	AppBaseURL               string
@@ -256,6 +264,7 @@ func LoadAppConfig() *AppConfig {
 		BidFloorPercentage:       getEnvAsInt("BID_FLOOR_PERCENTAGE", 85),
 		SupportPhone:             getEnv("SUPPORT_PHONE", "01107286690"),
 		DefaultImageURL:          getEnv("DEFAULT_IMAGE_URL", ""),
+		SeedEnabled:              getEnvAsBool("SEED_ENABLED", true),
 		FirebaseCredentialsPath:  getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseCredentialsJSON:  getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 		AppBaseURL:               getEnv("APP_BASE_URL", "http://localhost:8080"),
@@ -273,6 +282,15 @@ func LoadAppConfig() *AppConfig {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value := os.Getenv(key); value != "" {
+		if boolValue, err := strconv.ParseBool(value); err == nil {
+			return boolValue
+		}
 	}
 	return defaultValue
 }
