@@ -30,6 +30,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		"min_interests_at_registration": h.config.MinInterests,
 		"bid_floor_percentage":          h.config.BidFloorPercentage,
 		"support_phone":                 h.config.SupportPhone,
+		"require_documents":             h.config.RequireDocuments,
 		"units":                         []string{"kg", "ton", "piece", "box"},
 	})
 }

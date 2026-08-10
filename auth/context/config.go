@@ -11,6 +11,7 @@ type AuthConfig struct {
 	PasswordMaxLength    int
 	MinInterests         int
 	PhoneRegex           string
+	RequireDocuments     bool
 }
 
 func LoadAuthConfig() *AuthConfig {
@@ -23,5 +24,8 @@ func LoadAuthConfig() *AuthConfig {
 		PasswordMaxLength:    16,
 		MinInterests:         1,
 		PhoneRegex:           `^01[0125]\d{8}$`,
+		// Off by default: document verification gates nothing functionally —
+		// the manual subscription grant is the real checkpoint.
+		RequireDocuments: config.GetEnvAsBool("REQUIRE_DOCUMENTS", false),
 	}
 }

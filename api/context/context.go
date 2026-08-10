@@ -235,6 +235,7 @@ type AppConfig struct {
 	SupportPhone             string
 	DefaultImageURL          string
 	SeedEnabled              bool
+	RequireDocuments         bool
 	FirebaseCredentialsPath  string
 	FirebaseCredentialsJSON  string
 	AppBaseURL               string
@@ -265,6 +266,7 @@ func LoadAppConfig() *AppConfig {
 		SupportPhone:             getEnv("SUPPORT_PHONE", "01107286690"),
 		DefaultImageURL:          getEnv("DEFAULT_IMAGE_URL", ""),
 		SeedEnabled:              getEnvAsBool("SEED_ENABLED", true),
+		RequireDocuments:         getEnvAsBool("REQUIRE_DOCUMENTS", false),
 		FirebaseCredentialsPath:  getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseCredentialsJSON:  getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 		AppBaseURL:               getEnv("APP_BASE_URL", "http://localhost:8080"),
