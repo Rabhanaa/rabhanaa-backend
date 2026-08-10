@@ -31,6 +31,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		"bid_floor_percentage":          h.config.BidFloorPercentage,
 		"support_phone":                 h.config.SupportPhone,
 		"require_documents":             h.config.RequireDocuments,
+		"region_filter_enabled":         h.config.RegionFilterEnabled,
 		"units":                         []string{"kg", "ton", "piece", "box"},
 	})
 }

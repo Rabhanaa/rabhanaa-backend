@@ -19,6 +19,7 @@ WHERE br.status = 'active' AND br.end_time > NOW()
   AND (@exclude_offered_requests::int[] IS NULL OR br.id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = @user_id::int
   ))
+  AND (@filter_region_id::int = 0 OR br.region_id = @filter_region_id::int)
 ORDER BY
   CASE WHEN br.interest_id = ANY(@user_interest_ids::integer[]) THEN 0 ELSE 1 END,
   br.created_at DESC
@@ -30,7 +31,8 @@ WHERE status = 'active' AND end_time > NOW()
   AND (@exclude_owner_id::int IS NULL OR owner_id != @exclude_owner_id::int)
   AND (@exclude_offered_requests::int[] IS NULL OR id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = @user_id::int
-  ));
+  ))
+  AND (@filter_region_id::int = 0 OR region_id = @filter_region_id::int);
 
 -- name: SearchBuyRequests :many
 SELECT br.* FROM buy_requests br
@@ -40,6 +42,7 @@ WHERE br.status = 'active' AND br.end_time > NOW()
   AND (@exclude_offered_requests::int[] IS NULL OR br.id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = @user_id::int
   ))
+  AND (@filter_region_id::int = 0 OR br.region_id = @filter_region_id::int)
 ORDER BY
   CASE WHEN br.interest_id = ANY(@user_interest_ids::integer[]) THEN 0 ELSE 1 END,
   br.created_at DESC
@@ -52,7 +55,8 @@ WHERE status = 'active' AND end_time > NOW()
   AND (@exclude_owner_id::int IS NULL OR owner_id != @exclude_owner_id::int)
   AND (@exclude_offered_requests::int[] IS NULL OR id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = @user_id::int
-  ));
+  ))
+  AND (@filter_region_id::int = 0 OR region_id = @filter_region_id::int);
 
 -- name: ListBuyRequestsByOwner :many
 SELECT * FROM buy_requests WHERE owner_id = $1

@@ -28,16 +28,23 @@ WHERE status = 'active' AND end_time > NOW()
   AND ($2::int[] IS NULL OR id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = $3::int
   ))
+  AND ($4::int = 0 OR region_id = $4::int)
 `
 
 type CountActiveBuyRequestsParams struct {
 	ExcludeOwnerID         int32   `json:"exclude_owner_id"`
 	ExcludeOfferedRequests []int32 `json:"exclude_offered_requests"`
 	UserID                 int32   `json:"user_id"`
+	FilterRegionID         int32   `json:"filter_region_id"`
 }
 
 func (q *Queries) CountActiveBuyRequests(ctx context.Context, arg CountActiveBuyRequestsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveBuyRequests, arg.ExcludeOwnerID, arg.ExcludeOfferedRequests, arg.UserID)
+	row := q.db.QueryRow(ctx, countActiveBuyRequests,
+		arg.ExcludeOwnerID,
+		arg.ExcludeOfferedRequests,
+		arg.UserID,
+		arg.FilterRegionID,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -75,6 +82,7 @@ WHERE status = 'active' AND end_time > NOW()
   AND ($3::int[] IS NULL OR id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = $4::int
   ))
+  AND ($5::int = 0 OR region_id = $5::int)
 `
 
 type CountSearchBuyRequestsParams struct {
@@ -82,6 +90,7 @@ type CountSearchBuyRequestsParams struct {
 	ExcludeOwnerID         int32   `json:"exclude_owner_id"`
 	ExcludeOfferedRequests []int32 `json:"exclude_offered_requests"`
 	UserID                 int32   `json:"user_id"`
+	FilterRegionID         int32   `json:"filter_region_id"`
 }
 
 func (q *Queries) CountSearchBuyRequests(ctx context.Context, arg CountSearchBuyRequestsParams) (int64, error) {
@@ -90,6 +99,7 @@ func (q *Queries) CountSearchBuyRequests(ctx context.Context, arg CountSearchBuy
 		arg.ExcludeOwnerID,
 		arg.ExcludeOfferedRequests,
 		arg.UserID,
+		arg.FilterRegionID,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -554,8 +564,9 @@ WHERE br.status = 'active' AND br.end_time > NOW()
   AND ($4::int[] IS NULL OR br.id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = $5::int
   ))
+  AND ($6::int = 0 OR br.region_id = $6::int)
 ORDER BY
-  CASE WHEN br.interest_id = ANY($6::integer[]) THEN 0 ELSE 1 END,
+  CASE WHEN br.interest_id = ANY($7::integer[]) THEN 0 ELSE 1 END,
   br.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -566,6 +577,7 @@ type ListActiveBuyRequestsParams struct {
 	ExcludeOwnerID         int32   `json:"exclude_owner_id"`
 	ExcludeOfferedRequests []int32 `json:"exclude_offered_requests"`
 	UserID                 int32   `json:"user_id"`
+	FilterRegionID         int32   `json:"filter_region_id"`
 	UserInterestIds        []int32 `json:"user_interest_ids"`
 }
 
@@ -576,6 +588,7 @@ func (q *Queries) ListActiveBuyRequests(ctx context.Context, arg ListActiveBuyRe
 		arg.ExcludeOwnerID,
 		arg.ExcludeOfferedRequests,
 		arg.UserID,
+		arg.FilterRegionID,
 		arg.UserInterestIds,
 	)
 	if err != nil {
@@ -723,8 +736,9 @@ WHERE br.status = 'active' AND br.end_time > NOW()
   AND ($5::int[] IS NULL OR br.id NOT IN (
     SELECT so.buy_request_id FROM supply_offers so WHERE so.supplier_id = $6::int
   ))
+  AND ($7::int = 0 OR br.region_id = $7::int)
 ORDER BY
-  CASE WHEN br.interest_id = ANY($7::integer[]) THEN 0 ELSE 1 END,
+  CASE WHEN br.interest_id = ANY($8::integer[]) THEN 0 ELSE 1 END,
   br.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -736,6 +750,7 @@ type SearchBuyRequestsParams struct {
 	ExcludeOwnerID         int32   `json:"exclude_owner_id"`
 	ExcludeOfferedRequests []int32 `json:"exclude_offered_requests"`
 	UserID                 int32   `json:"user_id"`
+	FilterRegionID         int32   `json:"filter_region_id"`
 	UserInterestIds        []int32 `json:"user_interest_ids"`
 }
 
@@ -747,6 +762,7 @@ func (q *Queries) SearchBuyRequests(ctx context.Context, arg SearchBuyRequestsPa
 		arg.ExcludeOwnerID,
 		arg.ExcludeOfferedRequests,
 		arg.UserID,
+		arg.FilterRegionID,
 		arg.UserInterestIds,
 	)
 	if err != nil {

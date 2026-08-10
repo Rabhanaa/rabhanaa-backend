@@ -28,16 +28,23 @@ WHERE status = 'active' AND end_time > NOW()
   AND ($2::int[] IS NULL OR id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $3::int
   ))
+  AND ($4::int = 0 OR region_id = $4::int)
 `
 
 type CountActiveSellAuctionsParams struct {
 	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
 	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
 	UserID                int32   `json:"user_id"`
+	FilterRegionID        int32   `json:"filter_region_id"`
 }
 
 func (q *Queries) CountActiveSellAuctions(ctx context.Context, arg CountActiveSellAuctionsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveSellAuctions, arg.ExcludeOwnerID, arg.ExcludeBiddedAuctions, arg.UserID)
+	row := q.db.QueryRow(ctx, countActiveSellAuctions,
+		arg.ExcludeOwnerID,
+		arg.ExcludeBiddedAuctions,
+		arg.UserID,
+		arg.FilterRegionID,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -64,6 +71,7 @@ WHERE status = 'active' AND end_time > NOW()
   AND ($3::int[] IS NULL OR id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $4::int
   ))
+  AND ($5::int = 0 OR region_id = $5::int)
 `
 
 type CountSearchSellAuctionsParams struct {
@@ -71,6 +79,7 @@ type CountSearchSellAuctionsParams struct {
 	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
 	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
 	UserID                int32   `json:"user_id"`
+	FilterRegionID        int32   `json:"filter_region_id"`
 }
 
 func (q *Queries) CountSearchSellAuctions(ctx context.Context, arg CountSearchSellAuctionsParams) (int64, error) {
@@ -79,6 +88,7 @@ func (q *Queries) CountSearchSellAuctions(ctx context.Context, arg CountSearchSe
 		arg.ExcludeOwnerID,
 		arg.ExcludeBiddedAuctions,
 		arg.UserID,
+		arg.FilterRegionID,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -565,8 +575,9 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   AND ($4::int[] IS NULL OR sa.id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $5::int
   ))
+  AND ($6::int = 0 OR sa.region_id = $6::int)
 ORDER BY
-  CASE WHEN sa.interest_id = ANY($6::integer[]) THEN 0 ELSE 1 END,
+  CASE WHEN sa.interest_id = ANY($7::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -577,6 +588,7 @@ type ListActiveSellAuctionsParams struct {
 	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
 	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
 	UserID                int32   `json:"user_id"`
+	FilterRegionID        int32   `json:"filter_region_id"`
 	UserInterestIds       []int32 `json:"user_interest_ids"`
 }
 
@@ -587,6 +599,7 @@ func (q *Queries) ListActiveSellAuctions(ctx context.Context, arg ListActiveSell
 		arg.ExcludeOwnerID,
 		arg.ExcludeBiddedAuctions,
 		arg.UserID,
+		arg.FilterRegionID,
 		arg.UserInterestIds,
 	)
 	if err != nil {
@@ -738,8 +751,9 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   AND ($5::int[] IS NULL OR sa.id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $6::int
   ))
+  AND ($7::int = 0 OR sa.region_id = $7::int)
 ORDER BY
-  CASE WHEN sa.interest_id = ANY($7::integer[]) THEN 0 ELSE 1 END,
+  CASE WHEN sa.interest_id = ANY($8::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -751,6 +765,7 @@ type SearchSellAuctionsParams struct {
 	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
 	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
 	UserID                int32   `json:"user_id"`
+	FilterRegionID        int32   `json:"filter_region_id"`
 	UserInterestIds       []int32 `json:"user_interest_ids"`
 }
 
@@ -762,6 +777,7 @@ func (q *Queries) SearchSellAuctions(ctx context.Context, arg SearchSellAuctions
 		arg.ExcludeOwnerID,
 		arg.ExcludeBiddedAuctions,
 		arg.UserID,
+		arg.FilterRegionID,
 		arg.UserInterestIds,
 	)
 	if err != nil {

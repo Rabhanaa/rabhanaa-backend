@@ -245,18 +245,20 @@ func (q *Queries) EnsureSeedUser(ctx context.Context, arg EnsureSeedUserParams) 
 const getActiveUsersByInterest = `-- name: GetActiveUsersByInterest :many
 SELECT u.id FROM users u
 JOIN user_interests ui ON ui.user_id = u.id
-WHERE ui.interest_id = $1
+WHERE ui.interest_id = $1::int
   AND u.status = 'active'
-  AND u.id != $2
+  AND u.id != $2::int
+  AND ($3::int = 0 OR u.region_id = $3::int)
 `
 
 type GetActiveUsersByInterestParams struct {
-	InterestID int32 `json:"interest_id"`
-	ID         int32 `json:"id"`
+	InterestID     int32 `json:"interest_id"`
+	ExcludeUserID  int32 `json:"exclude_user_id"`
+	FilterRegionID int32 `json:"filter_region_id"`
 }
 
 func (q *Queries) GetActiveUsersByInterest(ctx context.Context, arg GetActiveUsersByInterestParams) ([]int32, error) {
-	rows, err := q.db.Query(ctx, getActiveUsersByInterest, arg.InterestID, arg.ID)
+	rows, err := q.db.Query(ctx, getActiveUsersByInterest, arg.InterestID, arg.ExcludeUserID, arg.FilterRegionID)
 	if err != nil {
 		return nil, err
 	}

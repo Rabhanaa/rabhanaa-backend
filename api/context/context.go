@@ -115,6 +115,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		cfg.AuctionDurationHours,
 		uploadService,
 		cfg.DefaultImageURL,
+		cfg.RegionFilterEnabled,
 	)
 
 	buyRequestService := auctionSvcPkg.NewBuyRequestService(
@@ -124,6 +125,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		cfg.AuctionDurationHours,
 		uploadService,
 		cfg.DefaultImageURL,
+		cfg.RegionFilterEnabled,
 	)
 
 	sellBiddingService := auctionSvcPkg.NewSellBiddingService(
@@ -193,6 +195,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		seedService,
 		queries,
 		cfg.SelectionWindowHours,
+		cfg.RegionFilterEnabled,
 	)
 
 	return &AppContext{
@@ -236,6 +239,7 @@ type AppConfig struct {
 	DefaultImageURL          string
 	SeedEnabled              bool
 	RequireDocuments         bool
+	RegionFilterEnabled      bool
 	FirebaseCredentialsPath  string
 	FirebaseCredentialsJSON  string
 	AppBaseURL               string
@@ -267,6 +271,7 @@ func LoadAppConfig() *AppConfig {
 		DefaultImageURL:          getEnv("DEFAULT_IMAGE_URL", ""),
 		SeedEnabled:              getEnvAsBool("SEED_ENABLED", true),
 		RequireDocuments:         getEnvAsBool("REQUIRE_DOCUMENTS", false),
+		RegionFilterEnabled:      getEnvAsBool("REGION_FILTER_ENABLED", false),
 		FirebaseCredentialsPath:  getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseCredentialsJSON:  getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 		AppBaseURL:               getEnv("APP_BASE_URL", "http://localhost:8080"),

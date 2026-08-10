@@ -15,9 +15,9 @@ type BuyRequestRepository interface {
 	GetByPublicID(ctx context.Context, publicID uuid.UUID) (sqlc.BuyRequest, error)
 	GetByPublicIDForUpdate(ctx context.Context, publicID uuid.UUID) (sqlc.BuyRequest, error)
 	ListActive(ctx context.Context, params sqlc.ListActiveBuyRequestsParams) ([]sqlc.BuyRequest, error)
-	CountActive(ctx context.Context, excludeOwnerID int32) (int64, error)
+	CountActive(ctx context.Context, excludeOwnerID, filterRegionID int32) (int64, error)
 	Search(ctx context.Context, params sqlc.SearchBuyRequestsParams) ([]sqlc.BuyRequest, error)
-	CountSearch(ctx context.Context, searchTerm string, excludeOwnerID int32) (int64, error)
+	CountSearch(ctx context.Context, searchTerm string, excludeOwnerID, filterRegionID int32) (int64, error)
 	ListByOwner(ctx context.Context, params sqlc.ListBuyRequestsByOwnerParams) ([]sqlc.BuyRequest, error)
 	CountByOwner(ctx context.Context, ownerID int32) (int64, error)
 	UpdateStatus(ctx context.Context, params sqlc.UpdateBuyRequestStatusParams) error
@@ -61,8 +61,9 @@ func (r *buyRequestRepository) ListActive(ctx context.Context, params sqlc.ListA
 	return r.queries.ListActiveBuyRequests(ctx, params)
 }
 
-func (r *buyRequestRepository) CountActive(ctx context.Context, excludeOwnerID int32) (int64, error) {
+func (r *buyRequestRepository) CountActive(ctx context.Context, excludeOwnerID, filterRegionID int32) (int64, error) {
 	return r.queries.CountActiveBuyRequests(ctx, sqlc.CountActiveBuyRequestsParams{
+		FilterRegionID:         filterRegionID,
 		ExcludeOwnerID:         excludeOwnerID,
 		ExcludeOfferedRequests: nil,
 		UserID:                 0,
@@ -73,8 +74,9 @@ func (r *buyRequestRepository) Search(ctx context.Context, params sqlc.SearchBuy
 	return r.queries.SearchBuyRequests(ctx, params)
 }
 
-func (r *buyRequestRepository) CountSearch(ctx context.Context, searchTerm string, excludeOwnerID int32) (int64, error) {
+func (r *buyRequestRepository) CountSearch(ctx context.Context, searchTerm string, excludeOwnerID, filterRegionID int32) (int64, error) {
 	return r.queries.CountSearchBuyRequests(ctx, sqlc.CountSearchBuyRequestsParams{
+		FilterRegionID:         filterRegionID,
 		SearchTerm:             searchTerm,
 		ExcludeOwnerID:         excludeOwnerID,
 		ExcludeOfferedRequests: nil,

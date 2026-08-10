@@ -174,9 +174,10 @@ LIMIT 1;
 -- name: GetActiveUsersByInterest :many
 SELECT u.id FROM users u
 JOIN user_interests ui ON ui.user_id = u.id
-WHERE ui.interest_id = $1
+WHERE ui.interest_id = @interest_id::int
   AND u.status = 'active'
-  AND u.id != $2;
+  AND u.id != @exclude_user_id::int
+  AND (@filter_region_id::int = 0 OR u.region_id = @filter_region_id::int);
 
 
 -- name: ListAllUsersAnyStatus :many

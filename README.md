@@ -76,6 +76,7 @@ docker run --env-file .env -p 8080:8080 rabhana-api
 | `MAX_NOTIFICATIONS_PER_USER`      | `10`    |
 | `SEED_ENABLED`                    | `true`  |
 | `REQUIRE_DOCUMENTS`               | `false` |
+| `REGION_FILTER_ENABLED`           | `false` |
 
 ### Integrations (optional)
 

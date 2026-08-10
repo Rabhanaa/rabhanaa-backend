@@ -26,6 +26,7 @@ type SellAuctionService struct {
 	auctionDuration    time.Duration
 	uploadService      UploadService
 	defaultImageURL    string
+	regionFilter       bool
 }
 
 type NotificationSender interface {
@@ -44,6 +45,7 @@ func NewSellAuctionService(
 	auctionDurationHours int,
 	uploadService UploadService,
 	defaultImageURL string,
+	regionFilter bool,
 ) *SellAuctionService {
 	duration := time.Duration(auctionDurationHours) * time.Hour
 	if duration == 0 {
@@ -56,6 +58,7 @@ func NewSellAuctionService(
 		auctionDuration:    duration,
 		uploadService:      uploadService,
 		defaultImageURL:    defaultImageURL,
+		regionFilter:       regionFilter,
 	}
 }
 
@@ -163,11 +166,12 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 		return nil, fmt.Errorf("failed to create auction: %w", err)
 	}
 
-	go func(interestNameAr, auctionTitle, auctionPublicID string, interestID, auctionID, ownerID int32) {
+	go func(interestNameAr, auctionTitle, auctionPublicID string, interestID, auctionID, ownerID, postRegionID int32) {
 		bgCtx := context.Background()
 		users, err := s.queries.GetActiveUsersByInterest(bgCtx, sqlc.GetActiveUsersByInterestParams{
-			InterestID: interestID,
-			ID:         ownerID,
+			InterestID:     interestID,
+			ExcludeUserID:  ownerID,
+			FilterRegionID: s.notifyRegion(postRegionID),
 		})
 		if err != nil {
 			slog.Error("broadcast sell auction: get interested users failed", "auction_id", auctionID, "error", err)
@@ -183,7 +187,7 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 		if err := s.queries.MarkSellAuctionNotified(bgCtx, auctionID); err != nil {
 			slog.Error("broadcast sell auction: mark notified failed", "auction_id", auctionID, "error", err)
 		}
-	}(interest.NameAr, auction.Title, auction.PublicID.String(), auction.InterestID, auction.ID, auction.OwnerID)
+	}(interest.NameAr, auction.Title, auction.PublicID.String(), auction.InterestID, auction.ID, auction.OwnerID, auction.RegionID)
 
 	return s.toResponse(auction, userID), nil
 }
@@ -267,6 +271,7 @@ func (s *SellAuctionService) ListActiveAuctions(ctx context.Context, userID int3
 		pageSize = 20
 	}
 
+	filterRegion := s.viewerRegion(ctx, userID)
 	auctions, err := s.auctionRepo.ListActive(ctx, sqlc.ListActiveSellAuctionsParams{
 		Limit:                 pageSize,
 		Offset:                (page - 1) * pageSize,
@@ -274,12 +279,13 @@ func (s *SellAuctionService) ListActiveAuctions(ctx context.Context, userID int3
 		ExcludeBiddedAuctions: nil,
 		UserID:                userID,
 		UserInterestIds:       interestIDs,
+		FilterRegionID:        filterRegion,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list auctions: %w", err)
 	}
 
-	total, err := s.auctionRepo.CountActive(ctx, userID)
+	total, err := s.auctionRepo.CountActive(ctx, userID, filterRegion)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count auctions: %w", err)
 	}
@@ -300,18 +306,20 @@ func (s *SellAuctionService) SearchAuctions(ctx context.Context, userID int32, s
 		pageSize = 20
 	}
 
+	filterRegion := s.viewerRegion(ctx, userID)
 	auctions, err := s.auctionRepo.Search(ctx, sqlc.SearchSellAuctionsParams{
 		SearchTerm:      searchTerm,
 		Limit:           pageSize,
 		Offset:          (page - 1) * pageSize,
 		ExcludeOwnerID:  userID,
 		UserInterestIds: interestIDs,
+		FilterRegionID:  filterRegion,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to search auctions: %w", err)
 	}
 
-	total, err := s.auctionRepo.CountSearch(ctx, searchTerm, userID)
+	total, err := s.auctionRepo.CountSearch(ctx, searchTerm, userID, filterRegion)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count search results: %w", err)
 	}
@@ -352,4 +360,32 @@ func (s *SellAuctionService) toResponse(auction sqlc.SellAuction, requestingUser
 		IsExpired:     auction.EndTime.Time.Before(time.Now()),
 		CreatedAt:     auction.CreatedAt.Time.Format(time.RFC3339),
 	}
+}
+
+// notifyRegion scopes a broadcast to the post's governorate when region
+// filtering is on, so nobody is notified about a post their feed hides.
+// Returns 0 (no filter) when the feature is off.
+func (s *SellAuctionService) notifyRegion(postRegionID int32) int32 {
+	if s.regionFilter {
+		return postRegionID
+	}
+	return 0
+}
+
+// viewerRegion returns the governorate a listing should be filtered to, or 0
+// for "no filter". The user lookup only happens while the feature is enabled,
+// so the default configuration costs nothing extra per request.
+func (s *SellAuctionService) viewerRegion(ctx context.Context, userID int32) int32 {
+	if !s.regionFilter {
+		return 0
+	}
+	user, err := s.queries.GetUserByID(ctx, userID)
+	if err != nil {
+		slog.Error("region filter: failed to load viewer", "error", err, "user_id", userID)
+		return 0
+	}
+	if !user.RegionID.Valid {
+		return 0
+	}
+	return user.RegionID.Int32
 }

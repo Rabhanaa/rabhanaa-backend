@@ -27,6 +27,7 @@ type CronService struct {
 	notificationSender NotificationSender
 	queries            *sqlc.Queries
 	selectionWindow    int32
+	regionFilter       bool
 	ticker             *time.Ticker
 	done               chan bool
 }
@@ -42,6 +43,7 @@ func NewCronService(
 	seedService *SeedService,
 	queries *sqlc.Queries,
 	selectionWindowHours int,
+	regionFilter bool,
 ) *CronService {
 	return &CronService{
 		sellAuctionRepo:    sellRepo,
@@ -54,6 +56,7 @@ func NewCronService(
 		seedService:        seedService,
 		queries:            queries,
 		selectionWindow:    int32(selectionWindowHours),
+		regionFilter:       regionFilter,
 	}
 }
 
@@ -229,8 +232,9 @@ func (c *CronService) processMotivationalMessages(ctx context.Context) {
 		for _, auction := range sellAuctions {
 			title, body := sellMotivation(auction.InterestName, auction.EndTime.Time)
 			users, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
-				InterestID: auction.InterestID,
-				ID:         auction.OwnerID,
+				InterestID:     auction.InterestID,
+				ExcludeUserID:  auction.OwnerID,
+				FilterRegionID: c.notifyRegion(auction.RegionID),
 			})
 			if err != nil {
 				slog.Error("failed to get interested users for motivation", "error", err, "auction_id", auction.ID)
@@ -256,8 +260,9 @@ func (c *CronService) processMotivationalMessages(ctx context.Context) {
 	for _, request := range buyRequests {
 		title, body := buyMotivation(request.InterestName, request.EndTime.Time)
 		users, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
-			InterestID: request.InterestID,
-			ID:         request.OwnerID,
+			InterestID:     request.InterestID,
+			ExcludeUserID:  request.OwnerID,
+			FilterRegionID: c.notifyRegion(request.RegionID),
 		})
 		if err != nil {
 			slog.Error("failed to get interested users for motivation", "error", err, "request_id", request.ID)
@@ -315,8 +320,9 @@ func (c *CronService) processNewListings(ctx context.Context) {
 
 	for _, auction := range auctions {
 		matchingUsers, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
-			InterestID: auction.InterestID,
-			ID:         auction.OwnerID,
+			InterestID:     auction.InterestID,
+			ExcludeUserID:  auction.OwnerID,
+			FilterRegionID: c.notifyRegion(auction.RegionID),
 		})
 		if err != nil {
 			slog.Error("failed to get active users by interest for sell auction", "error", err, "auction_id", auction.ID)
@@ -343,8 +349,9 @@ func (c *CronService) processNewListings(ctx context.Context) {
 
 	for _, request := range requests {
 		matchingUsers, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
-			InterestID: request.InterestID,
-			ID:         request.OwnerID,
+			InterestID:     request.InterestID,
+			ExcludeUserID:  request.OwnerID,
+			FilterRegionID: c.notifyRegion(request.RegionID),
 		})
 		if err != nil {
 			slog.Error("failed to get active users by interest for buy request", "error", err, "request_id", request.ID)
@@ -362,4 +369,12 @@ func (c *CronService) processNewListings(ctx context.Context) {
 			slog.Error("failed to mark buy request as notified", "error", err, "request_id", request.ID)
 		}
 	}
+}
+
+// See SellAuctionService.notifyRegion.
+func (c *CronService) notifyRegion(postRegionID int32) int32 {
+	if c.regionFilter {
+		return postRegionID
+	}
+	return 0
 }

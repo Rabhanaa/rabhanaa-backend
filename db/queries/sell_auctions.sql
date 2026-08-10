@@ -19,6 +19,7 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   AND (@exclude_bidded_auctions::int[] IS NULL OR sa.id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = @user_id::int
   ))
+  AND (@filter_region_id::int = 0 OR sa.region_id = @filter_region_id::int)
 ORDER BY
   CASE WHEN sa.interest_id = ANY(@user_interest_ids::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
@@ -30,7 +31,8 @@ WHERE status = 'active' AND end_time > NOW()
   AND (@exclude_owner_id::int IS NULL OR owner_id != @exclude_owner_id::int)
   AND (@exclude_bidded_auctions::int[] IS NULL OR id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = @user_id::int
-  ));
+  ))
+  AND (@filter_region_id::int = 0 OR region_id = @filter_region_id::int);
 
 -- name: SearchSellAuctions :many
 SELECT sa.* FROM sell_auctions sa
@@ -40,6 +42,7 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   AND (@exclude_bidded_auctions::int[] IS NULL OR sa.id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = @user_id::int
   ))
+  AND (@filter_region_id::int = 0 OR sa.region_id = @filter_region_id::int)
 ORDER BY
   CASE WHEN sa.interest_id = ANY(@user_interest_ids::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
@@ -52,7 +55,8 @@ WHERE status = 'active' AND end_time > NOW()
   AND (@exclude_owner_id::int IS NULL OR owner_id != @exclude_owner_id::int)
   AND (@exclude_bidded_auctions::int[] IS NULL OR id NOT IN (
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = @user_id::int
-  ));
+  ))
+  AND (@filter_region_id::int = 0 OR region_id = @filter_region_id::int);
 
 -- name: ListSellAuctionsByOwner :many
 SELECT * FROM sell_auctions WHERE owner_id = $1

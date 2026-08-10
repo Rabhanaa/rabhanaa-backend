@@ -15,9 +15,9 @@ type SellAuctionRepository interface {
 	GetByPublicID(ctx context.Context, publicID uuid.UUID) (sqlc.SellAuction, error)
 	GetByPublicIDForUpdate(ctx context.Context, publicID uuid.UUID) (sqlc.SellAuction, error)
 	ListActive(ctx context.Context, params sqlc.ListActiveSellAuctionsParams) ([]sqlc.SellAuction, error)
-	CountActive(ctx context.Context, excludeOwnerID int32) (int64, error)
+	CountActive(ctx context.Context, excludeOwnerID, filterRegionID int32) (int64, error)
 	Search(ctx context.Context, params sqlc.SearchSellAuctionsParams) ([]sqlc.SellAuction, error)
-	CountSearch(ctx context.Context, searchTerm string, excludeOwnerID int32) (int64, error)
+	CountSearch(ctx context.Context, searchTerm string, excludeOwnerID, filterRegionID int32) (int64, error)
 	ListByOwner(ctx context.Context, params sqlc.ListSellAuctionsByOwnerParams) ([]sqlc.SellAuction, error)
 	CountByOwner(ctx context.Context, ownerID int32) (int64, error)
 	UpdateStatus(ctx context.Context, params sqlc.UpdateSellAuctionStatusParams) error
@@ -60,8 +60,9 @@ func (r *sellAuctionRepository) ListActive(ctx context.Context, params sqlc.List
 	return r.queries.ListActiveSellAuctions(ctx, params)
 }
 
-func (r *sellAuctionRepository) CountActive(ctx context.Context, excludeOwnerID int32) (int64, error) {
+func (r *sellAuctionRepository) CountActive(ctx context.Context, excludeOwnerID, filterRegionID int32) (int64, error) {
 	return r.queries.CountActiveSellAuctions(ctx, sqlc.CountActiveSellAuctionsParams{
+		FilterRegionID:        filterRegionID,
 		ExcludeOwnerID:        excludeOwnerID,
 		ExcludeBiddedAuctions: nil,
 		UserID:                0,
@@ -72,8 +73,9 @@ func (r *sellAuctionRepository) Search(ctx context.Context, params sqlc.SearchSe
 	return r.queries.SearchSellAuctions(ctx, params)
 }
 
-func (r *sellAuctionRepository) CountSearch(ctx context.Context, searchTerm string, excludeOwnerID int32) (int64, error) {
+func (r *sellAuctionRepository) CountSearch(ctx context.Context, searchTerm string, excludeOwnerID, filterRegionID int32) (int64, error) {
 	return r.queries.CountSearchSellAuctions(ctx, sqlc.CountSearchSellAuctionsParams{
+		FilterRegionID:        filterRegionID,
 		SearchTerm:            searchTerm,
 		ExcludeOwnerID:        excludeOwnerID,
 		ExcludeBiddedAuctions: nil,

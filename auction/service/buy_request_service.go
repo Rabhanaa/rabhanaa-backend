@@ -25,6 +25,7 @@ type BuyRequestService struct {
 	auctionDuration    time.Duration
 	uploadService      UploadService
 	defaultImageURL    string
+	regionFilter       bool
 }
 
 func NewBuyRequestService(
@@ -34,6 +35,7 @@ func NewBuyRequestService(
 	auctionDurationHours int,
 	uploadService UploadService,
 	defaultImageURL string,
+	regionFilter bool,
 ) *BuyRequestService {
 	duration := time.Duration(auctionDurationHours) * time.Hour
 	if duration == 0 {
@@ -46,6 +48,7 @@ func NewBuyRequestService(
 		auctionDuration:    duration,
 		uploadService:      uploadService,
 		defaultImageURL:    defaultImageURL,
+		regionFilter:       regionFilter,
 	}
 }
 
@@ -151,11 +154,12 @@ func (s *BuyRequestService) CreateBuyRequest(ctx context.Context, userID int32, 
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	go func(interestNameAr, requestTitle, requestPublicID string, interestID, requestID, ownerID int32) {
+	go func(interestNameAr, requestTitle, requestPublicID string, interestID, requestID, ownerID, postRegionID int32) {
 		bgCtx := context.Background()
 		users, err := s.queries.GetActiveUsersByInterest(bgCtx, sqlc.GetActiveUsersByInterestParams{
-			InterestID: interestID,
-			ID:         ownerID,
+			InterestID:     interestID,
+			ExcludeUserID:  ownerID,
+			FilterRegionID: s.notifyRegion(postRegionID),
 		})
 		if err != nil {
 			slog.Error("broadcast buy request: get interested users failed", "request_id", requestID, "error", err)
@@ -171,7 +175,7 @@ func (s *BuyRequestService) CreateBuyRequest(ctx context.Context, userID int32, 
 		if err := s.queries.MarkBuyRequestNotified(bgCtx, requestID); err != nil {
 			slog.Error("broadcast buy request: mark notified failed", "request_id", requestID, "error", err)
 		}
-	}(interest.NameAr, request.Title, request.PublicID.String(), request.InterestID, request.ID, request.OwnerID)
+	}(interest.NameAr, request.Title, request.PublicID.String(), request.InterestID, request.ID, request.OwnerID, request.RegionID)
 
 	return s.toResponse(request, userID), nil
 }
@@ -255,6 +259,7 @@ func (s *BuyRequestService) ListActiveBuyRequests(ctx context.Context, userID in
 		pageSize = 20
 	}
 
+	filterRegion := s.viewerRegion(ctx, userID)
 	requests, err := s.requestRepo.ListActive(ctx, sqlc.ListActiveBuyRequestsParams{
 		Limit:                  pageSize,
 		Offset:                 (page - 1) * pageSize,
@@ -262,12 +267,13 @@ func (s *BuyRequestService) ListActiveBuyRequests(ctx context.Context, userID in
 		ExcludeOfferedRequests: nil,
 		UserID:                 userID,
 		UserInterestIds:        interestIDs,
+		FilterRegionID:         filterRegion,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list requests: %w", err)
 	}
 
-	total, err := s.requestRepo.CountActive(ctx, userID)
+	total, err := s.requestRepo.CountActive(ctx, userID, filterRegion)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count requests: %w", err)
 	}
@@ -288,18 +294,20 @@ func (s *BuyRequestService) SearchBuyRequests(ctx context.Context, userID int32,
 		pageSize = 20
 	}
 
+	filterRegion := s.viewerRegion(ctx, userID)
 	requests, err := s.requestRepo.Search(ctx, sqlc.SearchBuyRequestsParams{
 		SearchTerm:      searchTerm,
 		Limit:           pageSize,
 		Offset:          (page - 1) * pageSize,
 		ExcludeOwnerID:  userID,
 		UserInterestIds: interestIDs,
+		FilterRegionID:  filterRegion,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to search requests: %w", err)
 	}
 
-	total, err := s.requestRepo.CountSearch(ctx, searchTerm, userID)
+	total, err := s.requestRepo.CountSearch(ctx, searchTerm, userID, filterRegion)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count search results: %w", err)
 	}
@@ -341,4 +349,30 @@ func (s *BuyRequestService) toResponse(request sqlc.BuyRequest, requestingUserID
 		IsExpired:          request.EndTime.Time.Before(time.Now()),
 		CreatedAt:          request.CreatedAt.Time.Format(time.RFC3339),
 	}
+}
+
+// See SellAuctionService.notifyRegion.
+func (s *BuyRequestService) notifyRegion(postRegionID int32) int32 {
+	if s.regionFilter {
+		return postRegionID
+	}
+	return 0
+}
+
+// viewerRegion returns the governorate a listing should be filtered to, or 0
+// for "no filter". The user lookup only happens while the feature is enabled,
+// so the default configuration costs nothing extra per request.
+func (s *BuyRequestService) viewerRegion(ctx context.Context, userID int32) int32 {
+	if !s.regionFilter {
+		return 0
+	}
+	user, err := s.queries.GetUserByID(ctx, userID)
+	if err != nil {
+		slog.Error("region filter: failed to load viewer", "error", err, "user_id", userID)
+		return 0
+	}
+	if !user.RegionID.Valid {
+		return 0
+	}
+	return user.RegionID.Int32
 }
