@@ -10,6 +10,9 @@ type RegisterRequest struct {
 	JobID        int32  `json:"job_id" binding:"required,gt=0"`
 	Password     string `json:"password" binding:"required,min=8,max=16"`
 	SignupSource string `json:"signup_source"`
+	// Only meaningful for supply-side roles (importer, wholesaler, distributor,
+	// processor, supplier); ignored for the rest.
+	SuppliesToRetail bool `json:"supplies_to_retail"`
 }
 
 type ProfileRequest struct {
@@ -59,20 +62,21 @@ type AdminBanRequest struct {
 }
 
 type UserResponse struct {
-	PublicID        string  `json:"public_id"`
-	Name            string  `json:"name"`
-	Email           string  `json:"email"`
-	Phone           string  `json:"phone"`
-	Status          string  `json:"status"`
-	IsAdmin         bool    `json:"is_admin"`
-	RegionID        *int32  `json:"region_id,omitempty"`
-	JobID           *int32  `json:"job_id,omitempty"`
-	RegionName      string  `json:"region_name,omitempty"`
-	JobName         string  `json:"job_name,omitempty"`
-	RejectionReason *string `json:"rejection_reason,omitempty"`
-	Interests       []int32 `json:"interests,omitempty"`
-	Subscribed      bool    `json:"subscribed"`
-	InTrial         bool    `json:"in_trial"`
+	PublicID         string  `json:"public_id"`
+	Name             string  `json:"name"`
+	Email            string  `json:"email"`
+	Phone            string  `json:"phone"`
+	Status           string  `json:"status"`
+	IsAdmin          bool    `json:"is_admin"`
+	RegionID         *int32  `json:"region_id,omitempty"`
+	JobID            *int32  `json:"job_id,omitempty"`
+	RegionName       string  `json:"region_name,omitempty"`
+	JobName          string  `json:"job_name,omitempty"`
+	RejectionReason  *string `json:"rejection_reason,omitempty"`
+	Interests        []int32 `json:"interests,omitempty"`
+	SuppliesToRetail bool    `json:"supplies_to_retail"`
+	Subscribed       bool    `json:"subscribed"`
+	InTrial          bool    `json:"in_trial"`
 
 	// Lifecycle fields (admin detail only)
 	SuspendedUntil         *time.Time `json:"suspended_until,omitempty"`

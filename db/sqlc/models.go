@@ -302,6 +302,7 @@ type User struct {
 	BannedReason           pgtype.Text        `json:"banned_reason"`
 	StatusChangedByAdminID pgtype.Int4        `json:"status_changed_by_admin_id"`
 	StatusChangedAt        pgtype.Timestamptz `json:"status_changed_at"`
+	SuppliesToRetail       bool               `json:"supplies_to_retail"`
 }
 
 type UserDocument struct {

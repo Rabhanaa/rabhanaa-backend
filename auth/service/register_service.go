@@ -53,14 +53,15 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 	}
 
 	user, err := s.repo.CreateUser(ctx, sqlc.CreateUserParams{
-		Email:        req.Email,
-		Phone:        pgtype.Text{String: req.Phone, Valid: true},
-		PasswordHash: pgtype.Text{String: passwordHash, Valid: true},
-		Name:         req.Name,
-		RegionID:     pgtype.Int4{Int32: req.RegionID, Valid: true},
-		JobID:        pgtype.Int4{Int32: req.JobID, Valid: true},
-		Status:       "pending_documents",
-		SignupSource: signupSource,
+		Email:            req.Email,
+		Phone:            pgtype.Text{String: req.Phone, Valid: true},
+		PasswordHash:     pgtype.Text{String: passwordHash, Valid: true},
+		Name:             req.Name,
+		RegionID:         pgtype.Int4{Int32: req.RegionID, Valid: true},
+		JobID:            pgtype.Int4{Int32: req.JobID, Valid: true},
+		Status:           "pending_documents",
+		SignupSource:     signupSource,
+		SuppliesToRetail: req.SuppliesToRetail,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
@@ -114,16 +115,17 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 	return &model.AuthResponse{
 		AccessToken: token,
 		User: model.UserResponse{
-			PublicID:   publicID.String(),
-			Name:       user.Name,
-			Email:      user.Email,
-			Phone:      user.Phone.String,
-			Status:     user.Status,
-			IsAdmin:    user.Role.Valid && user.Role.String == "admin",
-			RegionID:   &user.RegionID.Int32,
-			JobID:      &user.JobID.Int32,
-			RegionName: region.NameAr,
-			JobName:    job.NameAr,
+			PublicID:         publicID.String(),
+			Name:             user.Name,
+			Email:            user.Email,
+			Phone:            user.Phone.String,
+			Status:           user.Status,
+			IsAdmin:          user.Role.Valid && user.Role.String == "admin",
+			RegionID:         &user.RegionID.Int32,
+			JobID:            &user.JobID.Int32,
+			RegionName:       region.NameAr,
+			JobName:          job.NameAr,
+			SuppliesToRetail: user.SuppliesToRetail,
 		},
 	}, nil
 }

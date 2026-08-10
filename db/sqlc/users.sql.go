@@ -86,20 +86,21 @@ func (q *Queries) CountUsersByStatus(ctx context.Context, status string) (int64,
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, phone, password_hash, name, job_id, region_id, status, signup_source)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at
+INSERT INTO users (email, phone, password_hash, name, job_id, region_id, status, signup_source, supplies_to_retail)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail
 `
 
 type CreateUserParams struct {
-	Email        string      `json:"email"`
-	Phone        pgtype.Text `json:"phone"`
-	PasswordHash pgtype.Text `json:"password_hash"`
-	Name         string      `json:"name"`
-	JobID        pgtype.Int4 `json:"job_id"`
-	RegionID     pgtype.Int4 `json:"region_id"`
-	Status       string      `json:"status"`
-	SignupSource string      `json:"signup_source"`
+	Email            string      `json:"email"`
+	Phone            pgtype.Text `json:"phone"`
+	PasswordHash     pgtype.Text `json:"password_hash"`
+	Name             string      `json:"name"`
+	JobID            pgtype.Int4 `json:"job_id"`
+	RegionID         pgtype.Int4 `json:"region_id"`
+	Status           string      `json:"status"`
+	SignupSource     string      `json:"signup_source"`
+	SuppliesToRetail bool        `json:"supplies_to_retail"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -112,6 +113,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.RegionID,
 		arg.Status,
 		arg.SignupSource,
+		arg.SuppliesToRetail,
 	)
 	var i User
 	err := row.Scan(
@@ -146,6 +148,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 	)
 	return i, err
 }
@@ -178,7 +181,7 @@ ON CONFLICT (email) DO UPDATE SET
     email_verified = TRUE,
     phone_verified = TRUE,
     updated_at = NOW()
-RETURNING id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at
+RETURNING id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail
 `
 
 type EnsureSeedUserParams struct {
@@ -234,6 +237,7 @@ func (q *Queries) EnsureSeedUser(ctx context.Context, arg EnsureSeedUserParams) 
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 	)
 	return i, err
 }
@@ -272,7 +276,7 @@ func (q *Queries) GetActiveUsersByInterest(ctx context.Context, arg GetActiveUse
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at FROM users WHERE email = $1
+SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -310,12 +314,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at FROM users WHERE id = $1
+SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int32) (User, error) {
@@ -353,12 +358,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id int32) (User, error) {
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 	)
 	return i, err
 }
 
 const getUserByPublicID = `-- name: GetUserByPublicID :one
-SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at FROM users WHERE public_id = $1
+SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail FROM users WHERE public_id = $1
 `
 
 func (q *Queries) GetUserByPublicID(ctx context.Context, publicID pgtype.UUID) (User, error) {
@@ -396,6 +402,7 @@ func (q *Queries) GetUserByPublicID(ctx context.Context, publicID pgtype.UUID) (
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 	)
 	return i, err
 }
@@ -587,7 +594,7 @@ func (q *Queries) GetUserSubscriptionStatus(ctx context.Context, userID int32) (
 
 const getUserWithRegion = `-- name: GetUserWithRegion :one
 SELECT
-    u.id, u.public_id, u.email, u.phone, u.phone_verified, u.password_hash, u.email_verified, u.email_verified_at, u.otp_hash, u.otp_expires_at, u.name, u.role, u.job_id, u.region_id, u.status, u.rejection_reason, u.latitude, u.longitude, u.fcm_token, u.created_at, u.updated_at, u.interests_count, u.region_name, u.job_name, u.signup_source, u.suspended_until, u.suspension_reason, u.banned_at, u.banned_reason, u.status_changed_by_admin_id, u.status_changed_at,
+    u.id, u.public_id, u.email, u.phone, u.phone_verified, u.password_hash, u.email_verified, u.email_verified_at, u.otp_hash, u.otp_expires_at, u.name, u.role, u.job_id, u.region_id, u.status, u.rejection_reason, u.latitude, u.longitude, u.fcm_token, u.created_at, u.updated_at, u.interests_count, u.region_name, u.job_name, u.signup_source, u.suspended_until, u.suspension_reason, u.banned_at, u.banned_reason, u.status_changed_by_admin_id, u.status_changed_at, u.supplies_to_retail,
     COALESCE(r.name_ar, '') as region_name
 FROM users u
 LEFT JOIN regions r ON r.id = u.region_id
@@ -626,6 +633,7 @@ type GetUserWithRegionRow struct {
 	BannedReason           pgtype.Text        `json:"banned_reason"`
 	StatusChangedByAdminID pgtype.Int4        `json:"status_changed_by_admin_id"`
 	StatusChangedAt        pgtype.Timestamptz `json:"status_changed_at"`
+	SuppliesToRetail       bool               `json:"supplies_to_retail"`
 	RegionName_2           string             `json:"region_name_2"`
 }
 
@@ -664,6 +672,7 @@ func (q *Queries) GetUserWithRegion(ctx context.Context, id int32) (GetUserWithR
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 		&i.RegionName_2,
 	)
 	return i, err
@@ -671,7 +680,7 @@ func (q *Queries) GetUserWithRegion(ctx context.Context, id int32) (GetUserWithR
 
 const getUserWithRegionAndJob = `-- name: GetUserWithRegionAndJob :one
 SELECT
-    u.id, u.public_id, u.email, u.phone, u.phone_verified, u.password_hash, u.email_verified, u.email_verified_at, u.otp_hash, u.otp_expires_at, u.name, u.role, u.job_id, u.region_id, u.status, u.rejection_reason, u.latitude, u.longitude, u.fcm_token, u.created_at, u.updated_at, u.interests_count, u.region_name, u.job_name, u.signup_source, u.suspended_until, u.suspension_reason, u.banned_at, u.banned_reason, u.status_changed_by_admin_id, u.status_changed_at,
+    u.id, u.public_id, u.email, u.phone, u.phone_verified, u.password_hash, u.email_verified, u.email_verified_at, u.otp_hash, u.otp_expires_at, u.name, u.role, u.job_id, u.region_id, u.status, u.rejection_reason, u.latitude, u.longitude, u.fcm_token, u.created_at, u.updated_at, u.interests_count, u.region_name, u.job_name, u.signup_source, u.suspended_until, u.suspension_reason, u.banned_at, u.banned_reason, u.status_changed_by_admin_id, u.status_changed_at, u.supplies_to_retail,
     COALESCE(r.name_ar, '') as region_name,
     COALESCE(j.name_ar, '') as job_name
 FROM users u
@@ -712,6 +721,7 @@ type GetUserWithRegionAndJobRow struct {
 	BannedReason           pgtype.Text        `json:"banned_reason"`
 	StatusChangedByAdminID pgtype.Int4        `json:"status_changed_by_admin_id"`
 	StatusChangedAt        pgtype.Timestamptz `json:"status_changed_at"`
+	SuppliesToRetail       bool               `json:"supplies_to_retail"`
 	RegionName_2           string             `json:"region_name_2"`
 	JobName_2              string             `json:"job_name_2"`
 }
@@ -751,6 +761,7 @@ func (q *Queries) GetUserWithRegionAndJob(ctx context.Context, id int32) (GetUse
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 		&i.RegionName_2,
 		&i.JobName_2,
 	)
@@ -759,7 +770,7 @@ func (q *Queries) GetUserWithRegionAndJob(ctx context.Context, id int32) (GetUse
 
 const getUserWithRegionAndJobByPublicID = `-- name: GetUserWithRegionAndJobByPublicID :one
 SELECT
-    u.id, u.public_id, u.email, u.phone, u.phone_verified, u.password_hash, u.email_verified, u.email_verified_at, u.otp_hash, u.otp_expires_at, u.name, u.role, u.job_id, u.region_id, u.status, u.rejection_reason, u.latitude, u.longitude, u.fcm_token, u.created_at, u.updated_at, u.interests_count, u.region_name, u.job_name, u.signup_source, u.suspended_until, u.suspension_reason, u.banned_at, u.banned_reason, u.status_changed_by_admin_id, u.status_changed_at,
+    u.id, u.public_id, u.email, u.phone, u.phone_verified, u.password_hash, u.email_verified, u.email_verified_at, u.otp_hash, u.otp_expires_at, u.name, u.role, u.job_id, u.region_id, u.status, u.rejection_reason, u.latitude, u.longitude, u.fcm_token, u.created_at, u.updated_at, u.interests_count, u.region_name, u.job_name, u.signup_source, u.suspended_until, u.suspension_reason, u.banned_at, u.banned_reason, u.status_changed_by_admin_id, u.status_changed_at, u.supplies_to_retail,
     COALESCE(r.name_ar, '') as region_name,
     COALESCE(j.name_ar, '') as job_name
 FROM users u
@@ -800,6 +811,7 @@ type GetUserWithRegionAndJobByPublicIDRow struct {
 	BannedReason           pgtype.Text        `json:"banned_reason"`
 	StatusChangedByAdminID pgtype.Int4        `json:"status_changed_by_admin_id"`
 	StatusChangedAt        pgtype.Timestamptz `json:"status_changed_at"`
+	SuppliesToRetail       bool               `json:"supplies_to_retail"`
 	RegionName_2           string             `json:"region_name_2"`
 	JobName_2              string             `json:"job_name_2"`
 }
@@ -839,6 +851,7 @@ func (q *Queries) GetUserWithRegionAndJobByPublicID(ctx context.Context, publicI
 		&i.BannedReason,
 		&i.StatusChangedByAdminID,
 		&i.StatusChangedAt,
+		&i.SuppliesToRetail,
 		&i.RegionName_2,
 		&i.JobName_2,
 	)
@@ -883,7 +896,7 @@ func (q *Queries) LazyRestoreExpiredSuspension(ctx context.Context, id int32) (i
 }
 
 const listAllUsersAnyStatus = `-- name: ListAllUsersAnyStatus :many
-SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2
+SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2
 `
 
 type ListAllUsersAnyStatusParams struct {
@@ -932,6 +945,7 @@ func (q *Queries) ListAllUsersAnyStatus(ctx context.Context, arg ListAllUsersAny
 			&i.BannedReason,
 			&i.StatusChangedByAdminID,
 			&i.StatusChangedAt,
+			&i.SuppliesToRetail,
 		); err != nil {
 			return nil, err
 		}
@@ -944,7 +958,7 @@ func (q *Queries) ListAllUsersAnyStatus(ctx context.Context, arg ListAllUsersAny
 }
 
 const listUsersByStatus = `-- name: ListUsersByStatus :many
-SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at FROM users WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
+SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail FROM users WHERE status = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3
 `
 
 type ListUsersByStatusParams struct {
@@ -994,6 +1008,7 @@ func (q *Queries) ListUsersByStatus(ctx context.Context, arg ListUsersByStatusPa
 			&i.BannedReason,
 			&i.StatusChangedByAdminID,
 			&i.StatusChangedAt,
+			&i.SuppliesToRetail,
 		); err != nil {
 			return nil, err
 		}
@@ -1006,7 +1021,7 @@ func (q *Queries) ListUsersByStatus(ctx context.Context, arg ListUsersByStatusPa
 }
 
 const searchUsers = `-- name: SearchUsers :many
-SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at FROM users
+SELECT id, public_id, email, phone, phone_verified, password_hash, email_verified, email_verified_at, otp_hash, otp_expires_at, name, role, job_id, region_id, status, rejection_reason, latitude, longitude, fcm_token, created_at, updated_at, interests_count, region_name, job_name, signup_source, suspended_until, suspension_reason, banned_at, banned_reason, status_changed_by_admin_id, status_changed_at, supplies_to_retail FROM users
 WHERE ($3::text = '' OR
        email ILIKE '%' || $3::text || '%' OR
        phone ILIKE '%' || $3::text || '%' OR
@@ -1069,6 +1084,7 @@ func (q *Queries) SearchUsers(ctx context.Context, arg SearchUsersParams) ([]Use
 			&i.BannedReason,
 			&i.StatusChangedByAdminID,
 			&i.StatusChangedAt,
+			&i.SuppliesToRetail,
 		); err != nil {
 			return nil, err
 		}

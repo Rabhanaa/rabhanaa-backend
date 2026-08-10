@@ -82,12 +82,13 @@ func (s *AuthService) Login(ctx context.Context, req model.LoginRequest, deviceI
 	return &model.AuthResponse{
 		AccessToken: token,
 		User: model.UserResponse{
-			PublicID: publicID.String(),
-			Name:     user.Name,
-			Email:    user.Email,
-			Phone:    user.Phone.String,
-			Status:   user.Status,
-			IsAdmin:  user.Role.Valid && user.Role.String == "admin",
+			PublicID:         publicID.String(),
+			Name:             user.Name,
+			Email:            user.Email,
+			Phone:            user.Phone.String,
+			Status:           user.Status,
+			IsAdmin:          user.Role.Valid && user.Role.String == "admin",
+			SuppliesToRetail: user.SuppliesToRetail,
 		},
 	}, nil
 }

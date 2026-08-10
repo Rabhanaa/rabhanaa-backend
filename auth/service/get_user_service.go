@@ -28,15 +28,16 @@ func (s *AuthService) GetCurrentUser(ctx context.Context, userID int32) (*model.
 
 	publicID, _ := uuid.FromBytes(user.PublicID.Bytes[:])
 	response := &model.UserResponse{
-		PublicID:   publicID.String(),
-		Name:       user.Name,
-		Email:      user.Email,
-		Phone:      user.Phone.String,
-		Status:     user.Status,
-		IsAdmin:    user.Role.Valid && user.Role.String == "admin",
-		RegionName: user.RegionName,
-		JobName:    user.JobName,
-		Interests:  interestIDs,
+		PublicID:         publicID.String(),
+		Name:             user.Name,
+		Email:            user.Email,
+		Phone:            user.Phone.String,
+		Status:           user.Status,
+		IsAdmin:          user.Role.Valid && user.Role.String == "admin",
+		RegionName:       user.RegionName,
+		JobName:          user.JobName,
+		Interests:        interestIDs,
+		SuppliesToRetail: user.SuppliesToRetail,
 	}
 
 	if user.JobID.Valid {
