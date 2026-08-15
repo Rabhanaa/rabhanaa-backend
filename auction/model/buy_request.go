@@ -67,6 +67,7 @@ type BuyRequestResponse struct {
 	FulfilledQuantity  string  `json:"fulfilled_quantity"`
 	EndTime            string  `json:"end_time"`
 	Status             string  `json:"status"`
+	ModerationReason   *string `json:"moderation_reason,omitempty"`
 	IsOwner            bool    `json:"is_owner"`
 	IsExpired          bool    `json:"is_expired"`
 	CreatedAt          string  `json:"created_at"`

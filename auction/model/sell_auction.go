@@ -68,19 +68,20 @@ type CreateSellAuctionRequest struct {
 type SellAuctionResponse struct {
 	PublicID string `json:"public_id"`
 	// OwnerName     string  `json:"owner_name"`
-	RegionName    string  `json:"region_name"`
-	InterestName  string  `json:"interest_name"`
-	Title         string  `json:"title"`
-	Description   *string `json:"description,omitempty"`
-	ImageURL      string  `json:"image_url"`
-	Unit          string  `json:"unit"`
-	Quantity      string  `json:"quantity"`
-	UnitPrice     string  `json:"unit_price"`
-	BuyAllFromOne bool    `json:"buy_all_from_one"`
-	BidCount      int32   `json:"bid_count"`
-	EndTime       string  `json:"end_time"`
-	Status        string  `json:"status"`
-	IsOwner       bool    `json:"is_owner"`
-	IsExpired     bool    `json:"is_expired"`
-	CreatedAt     string  `json:"created_at"`
+	RegionName       string  `json:"region_name"`
+	InterestName     string  `json:"interest_name"`
+	Title            string  `json:"title"`
+	Description      *string `json:"description,omitempty"`
+	ImageURL         string  `json:"image_url"`
+	Unit             string  `json:"unit"`
+	Quantity         string  `json:"quantity"`
+	UnitPrice        string  `json:"unit_price"`
+	BuyAllFromOne    bool    `json:"buy_all_from_one"`
+	BidCount         int32   `json:"bid_count"`
+	EndTime          string  `json:"end_time"`
+	Status           string  `json:"status"`
+	ModerationReason *string `json:"moderation_reason,omitempty"`
+	IsOwner          bool    `json:"is_owner"`
+	IsExpired        bool    `json:"is_expired"`
+	CreatedAt        string  `json:"created_at"`
 }

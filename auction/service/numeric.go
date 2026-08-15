@@ -18,3 +18,12 @@ func numericToString(n pgtype.Numeric) string {
 	}
 	return decimal.NewFromBigInt(n.Int, n.Exp).String()
 }
+
+// moderationReasonFor returns the admin's reason only to the post's owner —
+// other users have no business seeing why a listing was refused.
+func moderationReasonFor(reason pgtype.Text, isOwner bool) *string {
+	if !isOwner || !reason.Valid || reason.String == "" {
+		return nil
+	}
+	return &reason.String
+}

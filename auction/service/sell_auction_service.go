@@ -367,9 +367,11 @@ func (s *SellAuctionService) toResponse(auction sqlc.SellAuction, requestingUser
 		BidCount:      auction.BidCount,
 		EndTime:       auction.EndTime.Time.Format(time.RFC3339),
 		Status:        auction.Status,
-		IsOwner:       auction.OwnerID == requestingUserID,
-		IsExpired:     auction.EndTime.Time.Before(time.Now()),
-		CreatedAt:     auction.CreatedAt.Time.Format(time.RFC3339),
+		// Only the owner is told why their post was rejected or suspended.
+		ModerationReason: moderationReasonFor(auction.ModerationReason, auction.OwnerID == requestingUserID),
+		IsOwner:          auction.OwnerID == requestingUserID,
+		IsExpired:        auction.EndTime.Time.Before(time.Now()),
+		CreatedAt:        auction.CreatedAt.Time.Format(time.RFC3339),
 	}
 }
 

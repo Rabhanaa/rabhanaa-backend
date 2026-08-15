@@ -355,9 +355,11 @@ func (s *BuyRequestService) toResponse(request sqlc.BuyRequest, requestingUserID
 		FulfilledQuantity:  fulfilledStr,
 		EndTime:            request.EndTime.Time.Format(time.RFC3339),
 		Status:             request.Status,
-		IsOwner:            request.OwnerID == requestingUserID,
-		IsExpired:          request.EndTime.Time.Before(time.Now()),
-		CreatedAt:          request.CreatedAt.Time.Format(time.RFC3339),
+		// Only the owner is told why their post was rejected or suspended.
+		ModerationReason: moderationReasonFor(request.ModerationReason, request.OwnerID == requestingUserID),
+		IsOwner:          request.OwnerID == requestingUserID,
+		IsExpired:        request.EndTime.Time.Before(time.Now()),
+		CreatedAt:        request.CreatedAt.Time.Format(time.RFC3339),
 	}
 }
 
