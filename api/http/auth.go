@@ -58,41 +58,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-func (h *AuthHandler) GetOTP(c *gin.Context) {
-	var req model.GetOTPRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.authService.GetOTP(c.Request.Context(), req.Phone)
-	if err != nil {
-		handleError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "OTP sent"})
-}
-
-func (h *AuthHandler) VerifyOTP(c *gin.Context) {
-	var req model.VerifyOTPRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	deviceInfo := c.GetHeader("User-Agent")
-	ipAddress := c.ClientIP()
-
-	resp, err := h.authService.VerifyOTP(c.Request.Context(), req, deviceInfo, ipAddress)
-	if err != nil {
-		handleError(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, resp)
-}
-
 func (h *AuthHandler) GetMe(c *gin.Context) {
 	userID := c.GetInt("userID")
 	if userID == 0 {

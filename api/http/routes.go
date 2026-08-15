@@ -34,8 +34,6 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	apiV1.POST("/auth/forgot-password", authHandler.ForgotPassword)
 	apiV1.POST("/auth/verify-reset-code", authHandler.VerifyResetCode)
 	apiV1.POST("/auth/reset-password", authHandler.ResetPassword)
-	apiV1.POST("/auth/get-otp", authHandler.GetOTP)
-	apiV1.POST("/auth/verify-otp", authHandler.VerifyOTP)
 
 	// Reference data (public)
 	refHandler := NewReferenceHandler(ctx.Queries)

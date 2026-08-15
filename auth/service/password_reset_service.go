@@ -72,12 +72,12 @@ func (s *AuthService) RequestPasswordReset(ctx context.Context, rawEmail string)
 		return
 	}
 
-	code := generateOTP()
+	code := generateCode()
 	ttl := time.Duration(s.config.PasswordResetTTLMinutes) * time.Minute
 
 	if _, err := q.CreatePasswordResetCode(ctx, sqlc.CreatePasswordResetCodeParams{
 		UserID:    user.ID,
-		CodeHash:  hashOTP(code),
+		CodeHash:  hashCode(code),
 		ExpiresAt: pgtype.Timestamptz{Time: time.Now().Add(ttl), Valid: true},
 	}); err != nil {
 		slog.Error("password reset: failed to store code", "error", err, "user_id", user.ID)
@@ -192,7 +192,7 @@ func (s *AuthService) checkResetCode(ctx context.Context, rawEmail, code string)
 		return sqlc.User{}, sqlc.PasswordResetCode{}, fmt.Errorf("failed to get reset code: %w", err)
 	}
 
-	if !checkOTP(code, resetCode.CodeHash) {
+	if !checkCode(code, resetCode.CodeHash) {
 		if err := q.IncrementPasswordResetAttempts(ctx, resetCode.ID); err != nil {
 			slog.Error("password reset: failed to record attempt", "error", err, "code_id", resetCode.ID)
 		}

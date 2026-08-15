@@ -29,15 +29,6 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-type GetOTPRequest struct {
-	Phone string `json:"phone" binding:"required"`
-}
-
-type VerifyOTPRequest struct {
-	Phone string `json:"phone" binding:"required"`
-	OTP   string `json:"otp" binding:"required"`
-}
-
 type ForgotPasswordRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
@@ -56,10 +47,6 @@ type ResetPasswordRequest struct {
 type ChangePasswordRequest struct {
 	CurrentPassword string `json:"current_password" binding:"required"`
 	NewPassword     string `json:"new_password" binding:"required,min=8,max=16"`
-}
-
-type SetPasswordRequest struct {
-	Password string `json:"password" binding:"required,min=8,max=16"`
 }
 
 type AuthResponse struct {
