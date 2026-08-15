@@ -13,6 +13,9 @@ var (
 	ErrAccountNotActive         = errors.New("ACCOUNT_NOT_ACTIVE")
 	ErrPendingReview            = errors.New("PENDING_REVIEW")
 	ErrInvalidPostType          = errors.New("INVALID_POST_TYPE")
+	ErrInvalidResetCode         = errors.New("INVALID_RESET_CODE")
+	ErrResetCodeExpired         = errors.New("RESET_CODE_EXPIRED")
+	ErrInvalidPassword          = errors.New("INVALID_PASSWORD")
 	ErrPostNotModeratable       = errors.New("POST_NOT_MODERATABLE")
 	ErrModerationReasonRequired = errors.New("MODERATION_REASON_REQUIRED")
 	ErrAdminOnly                = errors.New("ADMIN_ONLY")
@@ -92,6 +95,9 @@ var ArabicMessages = map[string]string{
 	"INVALID_SIGNUP_SOURCE":       "مصدر التسجيل غير صحيح",
 	"AUCTION_NOT_FOUND":           "الصفقة غير موجودة",
 	"INVALID_POST_TYPE":           "نوع المنشور غير صحيح",
+	"INVALID_RESET_CODE":          "الرمز غير صحيح",
+	"RESET_CODE_EXPIRED":          "انتهت صلاحية الرمز — اطلب رمزاً جديداً",
+	"INVALID_PASSWORD":            "كلمة المرور يجب أن تكون 8-16 حرفاً وتحتوي على حرف كبير وصغير ورقم ورمز",
 	"POST_NOT_MODERATABLE":        "المنشور غير موجود أو لا يمكن تنفيذ هذا الإجراء عليه",
 	"MODERATION_REASON_REQUIRED":  "يجب كتابة السبب",
 	"AUCTION_NOT_ACTIVE":          "الصفقة غير نشطة",

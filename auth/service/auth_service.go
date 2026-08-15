@@ -4,6 +4,7 @@ import (
 	"context"
 
 	authctx "rabhana/auth/context"
+	"rabhana/lib/email"
 	notifModel "rabhana/notification/model"
 )
 
@@ -16,12 +17,14 @@ type AuthService struct {
 	repo               AuthRepository
 	config             *authctx.AuthConfig
 	notificationSender NotificationSender
+	emailClient        *email.Client
 }
 
-func NewAuthService(repo AuthRepository, config *authctx.AuthConfig, sender NotificationSender) *AuthService {
+func NewAuthService(repo AuthRepository, config *authctx.AuthConfig, sender NotificationSender, emailClient *email.Client) *AuthService {
 	return &AuthService{
 		repo:               repo,
 		config:             config,
 		notificationSender: sender,
+		emailClient:        emailClient,
 	}
 }

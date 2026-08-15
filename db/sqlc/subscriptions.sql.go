@@ -370,6 +370,7 @@ SELECT
     u.suspended_until as user_suspended_until,
     u.suspension_reason as user_suspension_reason,
     u.banned_reason as user_banned_reason,
+    u.password_changed_at as user_password_changed_at,
     u.public_id,
     us.id as subscription_id,
     us.tier_name,
@@ -406,6 +407,7 @@ type GetUserWithSubscriptionRow struct {
 	UserSuspendedUntil       pgtype.Timestamptz `json:"user_suspended_until"`
 	UserSuspensionReason     pgtype.Text        `json:"user_suspension_reason"`
 	UserBannedReason         pgtype.Text        `json:"user_banned_reason"`
+	UserPasswordChangedAt    pgtype.Timestamptz `json:"user_password_changed_at"`
 	PublicID                 pgtype.UUID        `json:"public_id"`
 	SubscriptionID           pgtype.Int4        `json:"subscription_id"`
 	TierName                 pgtype.Text        `json:"tier_name"`
@@ -438,6 +440,7 @@ func (q *Queries) GetUserWithSubscription(ctx context.Context, id int32) (GetUse
 		&i.UserSuspendedUntil,
 		&i.UserSuspensionReason,
 		&i.UserBannedReason,
+		&i.UserPasswordChangedAt,
 		&i.PublicID,
 		&i.SubscriptionID,
 		&i.TierName,

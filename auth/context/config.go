@@ -3,15 +3,16 @@ package context
 import "rabhana/pkg/config"
 
 type AuthConfig struct {
-	JWTSecret            string
-	JWTExpirationMinutes int
-	OTPExpirationMinutes int
-	OTPLength            int
-	PasswordMinLength    int
-	PasswordMaxLength    int
-	MinInterests         int
-	PhoneRegex           string
-	RequireDocuments     bool
+	JWTSecret               string
+	JWTExpirationMinutes    int
+	OTPExpirationMinutes    int
+	OTPLength               int
+	PasswordMinLength       int
+	PasswordMaxLength       int
+	MinInterests            int
+	PhoneRegex              string
+	RequireDocuments        bool
+	PasswordResetTTLMinutes int
 }
 
 func LoadAuthConfig() *AuthConfig {
@@ -26,6 +27,7 @@ func LoadAuthConfig() *AuthConfig {
 		PhoneRegex:           `^01[0125]\d{8}$`,
 		// Off by default: document verification gates nothing functionally —
 		// the manual subscription grant is the real checkpoint.
-		RequireDocuments: config.GetEnvAsBool("REQUIRE_DOCUMENTS", false),
+		RequireDocuments:        config.GetEnvAsBool("REQUIRE_DOCUMENTS", false),
+		PasswordResetTTLMinutes: config.GetEnvAsInt("PASSWORD_RESET_CODE_TTL_MINUTES", 15),
 	}
 }

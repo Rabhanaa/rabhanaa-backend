@@ -15,6 +15,7 @@ import (
 	authRepoPkg "rabhana/auth/repository"
 	authSvcPkg "rabhana/auth/service"
 	"rabhana/db/sqlc"
+	"rabhana/lib/email"
 	"rabhana/lib/firebase"
 	minioPkg "rabhana/lib/minio"
 	"rabhana/lib/postgres"
@@ -95,8 +96,16 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 	// Initialize notification service
 	notificationService := notificationSvcPkg.NewNotificationService(queries, firebaseClient, cfg.MaxNotificationsPerUser)
 
+	// Email client — disabled without an API key, in which case the reset code
+	// is logged rather than sent so local development still works.
+	emailClient := email.NewClient(email.Config{
+		APIKey:   cfg.ResendAPIKey,
+		From:     cfg.EmailFrom,
+		FromName: cfg.EmailFromName,
+	})
+
 	// Auth service wired after notification service so it can dispatch alerts
-	authService := authSvcPkg.NewAuthService(authRepository, authConfig, notificationService)
+	authService := authSvcPkg.NewAuthService(authRepository, authConfig, notificationService, emailClient)
 
 	// Subscription admin service
 	subscriptionAdminSvc := subscriptionSvcPkg.NewAdminService(queries, authRepository)
@@ -247,6 +256,9 @@ type AppConfig struct {
 	RequireDocuments         bool
 	RegionFilterEnabled      bool
 	PostApprovalEnabled      bool
+	ResendAPIKey             string
+	EmailFrom                string
+	EmailFromName            string
 	FirebaseCredentialsPath  string
 	FirebaseCredentialsJSON  string
 	AppBaseURL               string
@@ -280,6 +292,9 @@ func LoadAppConfig() *AppConfig {
 		RequireDocuments:         getEnvAsBool("REQUIRE_DOCUMENTS", false),
 		RegionFilterEnabled:      getEnvAsBool("REGION_FILTER_ENABLED", false),
 		PostApprovalEnabled:      getEnvAsBool("POST_APPROVAL_ENABLED", true),
+		ResendAPIKey:             getEnv("RESEND_API_KEY", ""),
+		EmailFrom:                getEnv("EMAIL_FROM", "no-reply@rabhanaa.com"),
+		EmailFromName:            getEnv("EMAIL_FROM_NAME", "ربحانة"),
 		FirebaseCredentialsPath:  getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseCredentialsJSON:  getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 		AppBaseURL:               getEnv("APP_BASE_URL", "http://localhost:8080"),

@@ -50,6 +50,19 @@ func Auth(authService *authSvc.AuthService) gin.HandlerFunc {
 			})
 			return
 		}
+		// Revocation. Flipping user_sessions.is_current does nothing here — this
+		// middleware never reads that table — so a password reset stamps
+		// password_changed_at and any token minted before it is stale. Without
+		// this a stolen token would outlive a reset by the full 365-day TTL.
+		if user.PasswordChangedAt.Valid && claims.IssuedAt != nil &&
+			claims.IssuedAt.Time.Before(user.PasswordChangedAt.Time) {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error":   errs.ErrUnauthorized.Error(),
+				"message": errs.GetArabicMessage(errs.ErrUnauthorized),
+			})
+			return
+		}
+
 		c.Set("userID", int(user.ID))
 
 		c.Next()

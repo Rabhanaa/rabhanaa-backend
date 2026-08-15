@@ -52,6 +52,7 @@ type Querier interface {
 	CompleteOrder(ctx context.Context, id int32) error
 	ConfirmOrderAsBuyer(ctx context.Context, id int32) error
 	ConfirmOrderAsSeller(ctx context.Context, id int32) error
+	ConsumePasswordResetCode(ctx context.Context, id int32) error
 	CountActiveBuyRequests(ctx context.Context, arg CountActiveBuyRequestsParams) (int64, error)
 	CountActiveSellAuctions(ctx context.Context, arg CountActiveSellAuctionsParams) (int64, error)
 	CountActiveSellBidsByBidder(ctx context.Context, bidderID int32) (int64, error)
@@ -68,6 +69,8 @@ type Querier interface {
 	CountOrdersByUser(ctx context.Context, sellerID int32) (int64, error)
 	CountPendingApprovalBuyRequests(ctx context.Context) (int64, error)
 	CountPendingApprovalSellAuctions(ctx context.Context) (int64, error)
+	// Throttle input: how many codes this user has requested since a cutoff.
+	CountRecentPasswordResetCodes(ctx context.Context, arg CountRecentPasswordResetCodesParams) (int64, error)
 	CountSearchBuyRequests(ctx context.Context, arg CountSearchBuyRequestsParams) (int64, error)
 	CountSearchSellAuctions(ctx context.Context, arg CountSearchSellAuctionsParams) (int64, error)
 	CountSellAuctionsByOwner(ctx context.Context, ownerID int32) (int64, error)
@@ -83,6 +86,7 @@ type Querier interface {
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
 	CreateOrderFromBuyRequest(ctx context.Context, arg CreateOrderFromBuyRequestParams) (Order, error)
 	CreateOrderFromSellAuction(ctx context.Context, arg CreateOrderFromSellAuctionParams) (Order, error)
+	CreatePasswordResetCode(ctx context.Context, arg CreatePasswordResetCodeParams) (PasswordResetCode, error)
 	CreateReferralCode(ctx context.Context, arg CreateReferralCodeParams) (ReferralCode, error)
 	CreateReferralUsage(ctx context.Context, arg CreateReferralUsageParams) error
 	CreateSellAuction(ctx context.Context, arg CreateSellAuctionParams) (SellAuction, error)
@@ -115,6 +119,9 @@ type Querier interface {
 	GetIssueByPublicID(ctx context.Context, publicID pgtype.UUID) (Issue, error)
 	GetJobByID(ctx context.Context, id int32) (Job, error)
 	GetJobByKey(ctx context.Context, key string) (Job, error)
+	// The user's most recent code that is still usable: not consumed, not expired,
+	// and not yet burned through its attempt allowance.
+	GetLivePasswordResetCode(ctx context.Context, arg GetLivePasswordResetCodeParams) (PasswordResetCode, error)
 	GetLosingBidderIDsForAuction(ctx context.Context, arg GetLosingBidderIDsForAuctionParams) ([]int32, error)
 	GetMissingDocumentTypes(ctx context.Context, userID int32) ([]interface{}, error)
 	GetMotivatableActiveBuyRequests(ctx context.Context) ([]BuyRequest, error)
@@ -166,9 +173,12 @@ type Querier interface {
 	IncrementBuyRequestAcceptedOfferCount(ctx context.Context, id int32) error
 	IncrementBuyRequestOfferCount(ctx context.Context, id int32) error
 	IncrementOfferCount(ctx context.Context, id int32) error
+	IncrementPasswordResetAttempts(ctx context.Context, id int32) error
 	IncrementReferralUsage(ctx context.Context, id int32) error
 	IncrementRequestCount(ctx context.Context, id int32) error
 	IncrementSellAuctionBidCount(ctx context.Context, id int32) error
+	// After a successful reset, retire every other outstanding code for the user.
+	InvalidatePasswordResetCodes(ctx context.Context, userID int32) error
 	InvalidateSession(ctx context.Context, id int32) error
 	InvalidateUserSessions(ctx context.Context, userID int32) error
 	LazyRestoreExpiredSuspension(ctx context.Context, id int32) (int64, error)
@@ -207,6 +217,8 @@ type Querier interface {
 	MarkNotChosenSellBids(ctx context.Context, auctionID int32) error
 	MarkNotChosenSupplyOffers(ctx context.Context, buyRequestID int32) error
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
+	// Revocation marker — tokens issued before this are rejected downstream.
+	MarkPasswordChanged(ctx context.Context, id int32) error
 	MarkSellAuctionMotivated(ctx context.Context, id int32) error
 	MarkSellAuctionNotified(ctx context.Context, id int32) error
 	MarkSellAuctionSelectionWarned(ctx context.Context, id int32) error

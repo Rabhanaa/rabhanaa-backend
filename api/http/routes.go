@@ -31,6 +31,9 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	authHandler := NewAuthHandler(ctx.AuthService, ctx.UploadService)
 	apiV1.POST("/auth/register", authHandler.Register)
 	apiV1.POST("/auth/login", authHandler.Login)
+	apiV1.POST("/auth/forgot-password", authHandler.ForgotPassword)
+	apiV1.POST("/auth/verify-reset-code", authHandler.VerifyResetCode)
+	apiV1.POST("/auth/reset-password", authHandler.ResetPassword)
 	apiV1.POST("/auth/get-otp", authHandler.GetOTP)
 	apiV1.POST("/auth/verify-otp", authHandler.VerifyOTP)
 

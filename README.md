@@ -85,7 +85,9 @@ docker run --env-file .env -p 8080:8080 rabhana-api
 |--------------------------------|----------------------------------|
 | `FIREBASE_CREDENTIALS_PATH`    | FCM push notifications           |
 | `FIREBASE_CREDENTIALS_JSON`    | FCM credentials as inline JSON   |
-| `GMAIL_USER`                   | Gmail SMTP sender                |
+| `RESEND_API_KEY`               | Resend key for password-reset email; empty logs the code instead |
+| `EMAIL_FROM`                   | Sender address on a verified domain |
+| `GMAIL_USER`                   | Gmail SMTP sender (unused)       |
 | `GMAIL_APP_PASSWORD`           | Gmail app password               |
 | `MAX_UPLOAD_SIZE_MB`           | Upload size cap (default `10`)   |
 | `APP_BASE_URL`                 | Public URL of this API           |

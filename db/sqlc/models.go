@@ -150,6 +150,16 @@ type Order struct {
 	CancelledAt          pgtype.Timestamptz `json:"cancelled_at"`
 }
 
+type PasswordResetCode struct {
+	ID         int32              `json:"id"`
+	UserID     int32              `json:"user_id"`
+	CodeHash   string             `json:"code_hash"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt pgtype.Timestamptz `json:"consumed_at"`
+	Attempts   int32              `json:"attempts"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type ReferralCode struct {
 	ID              int32              `json:"id"`
 	UserID          int32              `json:"user_id"`
@@ -309,6 +319,7 @@ type User struct {
 	StatusChangedByAdminID pgtype.Int4        `json:"status_changed_by_admin_id"`
 	StatusChangedAt        pgtype.Timestamptz `json:"status_changed_at"`
 	SuppliesToRetail       bool               `json:"supplies_to_retail"`
+	PasswordChangedAt      pgtype.Timestamptz `json:"password_changed_at"`
 }
 
 type UserDocument struct {

@@ -10,8 +10,8 @@ import (
 
 	"rabhana/auth/model"
 	authservice "rabhana/auth/service"
-	uploadservice "rabhana/upload/service"
 	"rabhana/pkg/errs"
+	uploadservice "rabhana/upload/service"
 )
 
 type AuthHandler struct {
@@ -318,4 +318,53 @@ func handleError(c *gin.Context, err error) {
 	}
 	arabicMessage := errs.GetArabicMessage(err)
 	c.JSON(code, gin.H{"error": err.Error(), "message": arabicMessage})
+}
+
+// ForgotPassword always reports success. Telling the caller whether the address
+// exists would turn this into an account-enumeration oracle, and the same goes
+// for throttling — a rejected request looks identical to an accepted one.
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req model.ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_BODY", "message": err.Error()})
+		return
+	}
+
+	h.authService.RequestPasswordReset(c.Request.Context(), req.Email)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "إذا كان هذا البريد مسجلاً لدينا فسيصلك رمز إعادة التعيين",
+	})
+}
+
+// VerifyResetCode checks a code without spending it, so the UI can move to the
+// new-password step before collecting one.
+func (h *AuthHandler) VerifyResetCode(c *gin.Context) {
+	var req model.VerifyResetCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_BODY", "message": err.Error()})
+		return
+	}
+
+	if err := h.authService.VerifyResetCode(c.Request.Context(), req.Email, req.Code); err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "الرمز صحيح"})
+}
+
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req model.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "INVALID_BODY", "message": err.Error()})
+		return
+	}
+
+	if err := h.authService.ResetPassword(c.Request.Context(), req.Email, req.Code, req.NewPassword); err != nil {
+		handleError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "تم تغيير كلمة المرور بنجاح"})
 }

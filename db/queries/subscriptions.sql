@@ -6,6 +6,7 @@ SELECT
     u.suspended_until as user_suspended_until,
     u.suspension_reason as user_suspension_reason,
     u.banned_reason as user_banned_reason,
+    u.password_changed_at as user_password_changed_at,
     u.public_id,
     us.id as subscription_id,
     us.tier_name,

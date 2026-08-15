@@ -28,22 +28,23 @@ const (
 )
 
 type User struct {
-	ID              int32
-	PublicID        pgtype.UUID
-	Email           string
-	Phone           pgtype.Text
-	PasswordHash    pgtype.Text
-	Name            string
-	JobID           pgtype.Int4
-	RegionID        pgtype.Int4
-	Status          UserStatus
-	OTPHash         pgtype.Text
-	OTPExpiresAt    pgtype.Timestamptz
-	FCMToken        pgtype.Text
-	Latitude        pgtype.Numeric
-	Longitude       pgtype.Numeric
-	IsAdmin         bool
-	RejectionReason pgtype.Text
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
+	ID                int32
+	PublicID          pgtype.UUID
+	Email             string
+	Phone             pgtype.Text
+	PasswordHash      pgtype.Text
+	Name              string
+	JobID             pgtype.Int4
+	RegionID          pgtype.Int4
+	Status            UserStatus
+	OTPHash           pgtype.Text
+	OTPExpiresAt      pgtype.Timestamptz
+	FCMToken          pgtype.Text
+	Latitude          pgtype.Numeric
+	Longitude         pgtype.Numeric
+	IsAdmin           bool
+	RejectionReason   pgtype.Text
+	PasswordChangedAt pgtype.Timestamptz
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
 }
