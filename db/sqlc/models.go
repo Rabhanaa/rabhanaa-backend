@@ -236,6 +236,23 @@ type SellBid struct {
 	IsNotChosen      bool               `json:"is_not_chosen"`
 }
 
+type ShippingCompany struct {
+	ID        int32              `json:"id"`
+	PublicID  pgtype.UUID        `json:"public_id"`
+	Name      string             `json:"name"`
+	Phone     string             `json:"phone"`
+	LogoUrl   pgtype.Text        `json:"logo_url"`
+	Notes     pgtype.Text        `json:"notes"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type ShippingCompanyRegion struct {
+	ShippingCompanyID int32 `json:"shipping_company_id"`
+	RegionID          int32 `json:"region_id"`
+}
+
 type Subscription struct {
 	ID        int32              `json:"id"`
 	UserID    int32              `json:"user_id"`

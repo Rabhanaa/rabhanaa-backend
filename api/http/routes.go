@@ -58,6 +58,11 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// Config endpoint (authenticated users only)
 	protected.GET("/config", configHandler.GetConfig)
 
+	// Carrier directory. Authenticated rather than public like /regions, because
+	// it returns partner phone numbers.
+	shippingHandler := NewShippingHandler(ctx.Queries)
+	protected.GET("/shipping-companies", shippingHandler.ListForRegion)
+
 	protected.GET("/auth/me", authHandler.GetMe)
 	protected.GET("/auth/status", authHandler.GetStatus)
 	protected.POST("/auth/documents", authHandler.SubmitDocuments)
@@ -160,6 +165,11 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	adminGroup.GET("/issues", issueHandler.AdminListAll)
 	adminGroup.GET("/issues/:id", issueHandler.AdminGetDetail)
 	adminGroup.PATCH("/issues/:id/close", issueHandler.AdminCloseIssue)
+
+	adminGroup.GET("/shipping-companies", shippingHandler.AdminList)
+	adminGroup.POST("/shipping-companies", shippingHandler.AdminCreate)
+	adminGroup.PATCH("/shipping-companies/:id", shippingHandler.AdminUpdate)
+	adminGroup.DELETE("/shipping-companies/:id", shippingHandler.AdminDeactivate)
 
 	moderationHandler := NewAdminModerationHandler(ctx.ModerationService)
 	adminGroup.GET("/posts/pending", moderationHandler.ListPending)

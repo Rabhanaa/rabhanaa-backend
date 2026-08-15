@@ -47,6 +47,7 @@ type Querier interface {
 	CancelSellAuction(ctx context.Context, id int32) error
 	CheckOrderExistsForBuyRequestAndSupplier(ctx context.Context, arg CheckOrderExistsForBuyRequestAndSupplierParams) (bool, error)
 	CheckOrderExistsForSellAuction(ctx context.Context, sellAuctionID pgtype.Int4) (bool, error)
+	ClearShippingCompanyRegions(ctx context.Context, shippingCompanyID int32) error
 	ClearUserOTP(ctx context.Context, id int32) error
 	CloseIssueIfOpen(ctx context.Context, publicID pgtype.UUID) (int32, error)
 	CompleteOrder(ctx context.Context, id int32) error
@@ -92,12 +93,16 @@ type Querier interface {
 	CreateSellAuction(ctx context.Context, arg CreateSellAuctionParams) (SellAuction, error)
 	CreateSellBid(ctx context.Context, arg CreateSellBidParams) (SellBid, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (UserSession, error)
+	CreateShippingCompany(ctx context.Context, arg CreateShippingCompanyParams) (ShippingCompany, error)
 	CreateSupplyOffer(ctx context.Context, arg CreateSupplyOfferParams) (SupplyOffer, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateUserDocument(ctx context.Context, arg CreateUserDocumentParams) (UserDocument, error)
 	CreateUserSubscription(ctx context.Context, arg CreateUserSubscriptionParams) (UserSubscription, error)
 	DeactivateAllUserSubscriptions(ctx context.Context, userID int32) error
 	DeactivateDeviceToken(ctx context.Context, token string) error
+	// Soft delete: a merchant may already have written the number down, and the
+	// admin's own history should not lose the record.
+	DeactivateShippingCompany(ctx context.Context, publicID pgtype.UUID) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeleteOldNotifications(ctx context.Context, arg DeleteOldNotificationsParams) error
 	DeleteUserInterests(ctx context.Context, userID int32) error
@@ -139,6 +144,7 @@ type Querier interface {
 	GetSellBidByID(ctx context.Context, id int32) (SellBid, error)
 	GetSellBidByPublicID(ctx context.Context, publicID pgtype.UUID) (SellBid, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (UserSession, error)
+	GetShippingCompanyByPublicID(ctx context.Context, publicID pgtype.UUID) (ShippingCompany, error)
 	// Fires once, during the final hour before the selection deadline.
 	GetSoonExpiringSelectionBuyRequests(ctx context.Context, windowHours int32) ([]BuyRequest, error)
 	// Fires once, during the final hour before the selection deadline.
@@ -186,6 +192,8 @@ type Querier interface {
 	ListActiveBuyRequests(ctx context.Context, arg ListActiveBuyRequestsParams) ([]BuyRequest, error)
 	ListActiveSellAuctions(ctx context.Context, arg ListActiveSellAuctionsParams) ([]SellAuction, error)
 	ListAllIssues(ctx context.Context, arg ListAllIssuesParams) ([]Issue, error)
+	// Admin view: everything, including deactivated carriers.
+	ListAllShippingCompanies(ctx context.Context) ([]ShippingCompany, error)
 	ListAllUsersAnyStatus(ctx context.Context, arg ListAllUsersAnyStatusParams) ([]User, error)
 	ListBuyRequestsByOwner(ctx context.Context, arg ListBuyRequestsByOwnerParams) ([]BuyRequest, error)
 	ListInterests(ctx context.Context) ([]Interest, error)
@@ -207,6 +215,10 @@ type Querier interface {
 	ListSellAuctionsByOwner(ctx context.Context, arg ListSellAuctionsByOwnerParams) ([]SellAuction, error)
 	ListSellBidsByAuction(ctx context.Context, auctionID int32) ([]ListSellBidsByAuctionRow, error)
 	ListSellBidsByBidder(ctx context.Context, arg ListSellBidsByBidderParams) ([]ListSellBidsByBidderRow, error)
+	// What a merchant sees while creating a post: active carriers that actually
+	// serve the post's governorate.
+	ListShippingCompaniesByRegion(ctx context.Context, regionID int32) ([]ShippingCompany, error)
+	ListShippingCompanyRegions(ctx context.Context, shippingCompanyID int32) ([]ListShippingCompanyRegionsRow, error)
 	ListSupplyOffersByRequest(ctx context.Context, buyRequestID int32) ([]ListSupplyOffersByRequestRow, error)
 	ListSupplyOffersBySupplier(ctx context.Context, arg ListSupplyOffersBySupplierParams) ([]ListSupplyOffersBySupplierRow, error)
 	ListUsersByStatus(ctx context.Context, arg ListUsersByStatusParams) ([]User, error)
@@ -234,6 +246,9 @@ type Querier interface {
 	SearchUsersCount(ctx context.Context, arg SearchUsersCountParams) (int64, error)
 	SelectSellBid(ctx context.Context, id int32) error
 	SelectSellWinner(ctx context.Context, arg SelectSellWinnerParams) error
+	// Coverage is replaced wholesale rather than added and removed one at a time —
+	// it is a checkbox list in practice. Paired with ClearShippingCompanyRegions.
+	SetShippingCompanyRegions(ctx context.Context, arg SetShippingCompanyRegionsParams) error
 	SumAcceptedQuantityByRequest(ctx context.Context, buyRequestID int32) (pgtype.Numeric, error)
 	SuspendBuyRequest(ctx context.Context, arg SuspendBuyRequestParams) (BuyRequest, error)
 	SuspendSellAuction(ctx context.Context, arg SuspendSellAuctionParams) (SellAuction, error)
@@ -245,6 +260,7 @@ type Querier interface {
 	UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusParams) error
 	UpdateSellAuctionStatus(ctx context.Context, arg UpdateSellAuctionStatusParams) error
 	UpdateSessionLastUsed(ctx context.Context, id int32) error
+	UpdateShippingCompany(ctx context.Context, arg UpdateShippingCompanyParams) (ShippingCompany, error)
 	UpdateUserCachedNames(ctx context.Context, arg UpdateUserCachedNamesParams) error
 	UpdateUserFCMToken(ctx context.Context, arg UpdateUserFCMTokenParams) error
 	UpdateUserInterestsCount(ctx context.Context, arg UpdateUserInterestsCountParams) error
