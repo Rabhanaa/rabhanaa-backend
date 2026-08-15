@@ -46,6 +46,14 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	authOnly.Use(middleware.Auth(ctx.AuthService))
 	authOnly.POST("/auth/logout", authHandler.Logout)
 
+	// Public browsing (#4): readable without an account, but OptionalAuth still
+	// identifies a signed-in visitor so they keep their region filter, retailer
+	// filter, own-post exclusion and is_owner flag. Rate limited because these
+	// are the only unauthenticated endpoints that touch business data.
+	publicRead := apiV1.Group("")
+	publicRead.Use(middleware.PublicRateLimit())
+	publicRead.Use(middleware.OptionalAuth(ctx.AuthService))
+
 	// Protected routes (require auth + account status check with subscription)
 	protected := apiV1.Group("")
 	protected.Use(middleware.Auth(ctx.AuthService))
@@ -56,7 +64,9 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	protected.POST("/upload", uploadHandler.UploadFile)
 
 	// Config endpoint (authenticated users only)
-	protected.GET("/config", configHandler.GetConfig)
+	// Public: the register prompt and WhatsApp button need support_phone before
+	// anyone has logged in. The remaining values are UI hints.
+	publicRead.GET("/config", configHandler.GetConfig)
 
 	// Carrier directory. Authenticated rather than public like /regions, because
 	// it returns partner phone numbers.
@@ -75,19 +85,19 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// Auction routes
 	sellHandler := NewSellAuctionHandler(ctx.SellAuctionService)
 	protected.POST("/sell-auctions", sellHandler.Create)
-	protected.GET("/sell-auctions", sellHandler.List)
-	protected.GET("/sell-auctions/search", sellHandler.Search)
+	publicRead.GET("/sell-auctions", sellHandler.List)
+	publicRead.GET("/sell-auctions/search", sellHandler.Search)
 	protected.GET("/sell-auctions/mine", sellHandler.ListMine)
-	protected.GET("/sell-auctions/:id", sellHandler.GetDetail)
+	publicRead.GET("/sell-auctions/:id", sellHandler.GetDetail)
 	protected.POST("/sell-auctions/:id/cancel", sellHandler.Cancel)
 
 	// Buy request routes
 	buyHandler := NewBuyRequestHandler(ctx.BuyRequestService)
 	protected.POST("/buy-requests", buyHandler.Create)
-	protected.GET("/buy-requests", buyHandler.List)
-	protected.GET("/buy-requests/search", buyHandler.Search)
+	publicRead.GET("/buy-requests", buyHandler.List)
+	publicRead.GET("/buy-requests/search", buyHandler.Search)
 	protected.GET("/buy-requests/mine", buyHandler.ListMine)
-	protected.GET("/buy-requests/:id", buyHandler.GetDetail)
+	publicRead.GET("/buy-requests/:id", buyHandler.GetDetail)
 	protected.POST("/buy-requests/:id/cancel", buyHandler.Cancel)
 
 	// Bid routes

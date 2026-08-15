@@ -388,6 +388,12 @@ func (s *BuyRequestService) notifyRegion(postRegionID int32) int32 {
 // viewer resolves the listing filters for whoever is asking. See
 // SellAuctionService.viewer.
 func (s *BuyRequestService) viewer(ctx context.Context, userID int32) viewerContext {
+	// Anonymous browsing (#4): there is nobody to personalise for, and looking
+	// up id 0 would fail and log an error on every public request.
+	if userID == 0 {
+		return viewerContext{}
+	}
+
 	user, err := s.queries.GetUserByID(ctx, userID)
 	if err != nil {
 		slog.Error("failed to load viewer for listing filters", "error", err, "user_id", userID)
