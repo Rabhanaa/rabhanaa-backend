@@ -26,6 +26,7 @@ type BuyRequestService struct {
 	uploadService      UploadService
 	defaultImageURL    string
 	regionFilter       bool
+	postApproval       bool
 }
 
 func NewBuyRequestService(
@@ -36,6 +37,7 @@ func NewBuyRequestService(
 	uploadService UploadService,
 	defaultImageURL string,
 	regionFilter bool,
+	postApproval bool,
 ) *BuyRequestService {
 	duration := time.Duration(auctionDurationHours) * time.Hour
 	if duration == 0 {
@@ -49,6 +51,7 @@ func NewBuyRequestService(
 		uploadService:      uploadService,
 		defaultImageURL:    defaultImageURL,
 		regionFilter:       regionFilter,
+		postApproval:       postApproval,
 	}
 }
 
@@ -149,6 +152,7 @@ func (s *BuyRequestService) CreateBuyRequest(ctx context.Context, userID int32, 
 		OwnerName:     user.Name,
 		RegionName:    region.NameAr,
 		InterestName:  interest.NameAr,
+		Status:        s.initialStatus(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
@@ -216,6 +220,12 @@ func (s *BuyRequestService) GetBuyRequestDetail(ctx context.Context, requestPubl
 			return nil, errs.ErrAuctionNotFound
 		}
 		return nil, fmt.Errorf("failed to get request: %w", err)
+	}
+
+	// See SellAuctionService.GetSellAuctionDetail — non-live posts are
+	// owner-only so a rejected or suspended post is not reachable by link.
+	if request.Status != "active" && request.OwnerID != requestingUserID {
+		return nil, errs.ErrAuctionNotFound
 	}
 
 	return s.toResponse(request, requestingUserID), nil
@@ -375,4 +385,14 @@ func (s *BuyRequestService) viewerRegion(ctx context.Context, userID int32) int3
 		return 0
 	}
 	return user.RegionID.Int32
+}
+
+// initialStatus decides whether a new post goes live immediately or waits for an
+// admin. end_time is still written at creation because the column is NOT NULL,
+// but it is recomputed on approval — nothing reads it while the post is not active.
+func (s *BuyRequestService) initialStatus() string {
+	if s.postApproval {
+		return "pending_approval"
+	}
+	return "active"
 }

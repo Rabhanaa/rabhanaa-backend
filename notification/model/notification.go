@@ -25,6 +25,10 @@ const (
 	EventSelectionExpired     EventType = "selection_expired"
 	EventOrderCompleted       EventType = "order_completed"
 	EventOrderExpired         EventType = "order_expired"
+
+	EventPostApproved  EventType = "post_approved"
+	EventPostRejected  EventType = "post_rejected"
+	EventPostSuspended EventType = "post_suspended"
 )
 
 var NotificationMessages = map[EventType]struct{ Title, Body string }{
@@ -49,4 +53,8 @@ var NotificationMessages = map[EventType]struct{ Title, Body string }{
 	EventSelectionExpired:     {"انتهت فترة الاختيار", "انتهت مهلة الاختيار وتم إلغاء الصفقة"},
 	EventOrderCompleted:       {"اكتمال الطلب", "تم تأكيد الطلب من الطرفين وهو جاهز للتنفيذ"},
 	EventOrderExpired:         {"انتهاء مهلة الطلب", "انتهت مهلة تأكيد الطلب (30 دقيقة) وتم إلغاؤه"},
+	// Rejection and suspension append the admin's reason to the body.
+	EventPostApproved:  {"تم نشر منشورك", "تمت الموافقة على منشورك وهو الآن متاح للجميع"},
+	EventPostRejected:  {"لم تتم الموافقة على منشورك", "تم رفض المنشور"},
+	EventPostSuspended: {"تم إيقاف منشورك", "تم إيقاف المنشور مؤقتاً"},
 }

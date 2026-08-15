@@ -160,6 +160,14 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	adminGroup.GET("/issues/:id", issueHandler.AdminGetDetail)
 	adminGroup.PATCH("/issues/:id/close", issueHandler.AdminCloseIssue)
 
+	moderationHandler := NewAdminModerationHandler(ctx.ModerationService)
+	adminGroup.GET("/posts/pending", moderationHandler.ListPending)
+	adminGroup.GET("/posts/published", moderationHandler.ListPublished)
+	adminGroup.POST("/posts/:id/approve", moderationHandler.Approve)
+	adminGroup.POST("/posts/:id/reject", moderationHandler.Reject)
+	adminGroup.POST("/posts/:id/suspend", moderationHandler.Suspend)
+	adminGroup.POST("/posts/:id/unsuspend", moderationHandler.Unsuspend)
+
 	analyticsHandler := NewAdminAnalyticsHandler(ctx.AnalyticsService)
 	adminGroup.GET("/analytics/overview", analyticsHandler.Overview)
 	adminGroup.GET("/analytics/timeseries", analyticsHandler.TimeSeries)

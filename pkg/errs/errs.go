@@ -3,19 +3,22 @@ package errs
 import "errors"
 
 var (
-	ErrInvalidCredentials = errors.New("INVALID_CREDENTIALS")
-	ErrEmailAlreadyExists = errors.New("EMAIL_ALREADY_EXISTS")
-	ErrInvalidPhone       = errors.New("INVALID_PHONE")
-	ErrInvalidOTP         = errors.New("INVALID_OTP")
-	ErrOTPExpired         = errors.New("OTP_EXPIRED")
-	ErrSessionExpired     = errors.New("SESSION_EXPIRED")
-	ErrUnauthorized       = errors.New("UNAUTHORIZED")
-	ErrAccountNotActive   = errors.New("ACCOUNT_NOT_ACTIVE")
-	ErrPendingReview      = errors.New("PENDING_REVIEW")
-	ErrAdminOnly          = errors.New("ADMIN_ONLY")
-	ErrInvalidRegionID    = errors.New("INVALID_REGION_ID")
-	ErrInvalidJobID       = errors.New("INVALID_JOB_ID")
-	ErrInvalidSignupSource = errors.New("INVALID_SIGNUP_SOURCE")
+	ErrInvalidCredentials       = errors.New("INVALID_CREDENTIALS")
+	ErrEmailAlreadyExists       = errors.New("EMAIL_ALREADY_EXISTS")
+	ErrInvalidPhone             = errors.New("INVALID_PHONE")
+	ErrInvalidOTP               = errors.New("INVALID_OTP")
+	ErrOTPExpired               = errors.New("OTP_EXPIRED")
+	ErrSessionExpired           = errors.New("SESSION_EXPIRED")
+	ErrUnauthorized             = errors.New("UNAUTHORIZED")
+	ErrAccountNotActive         = errors.New("ACCOUNT_NOT_ACTIVE")
+	ErrPendingReview            = errors.New("PENDING_REVIEW")
+	ErrInvalidPostType          = errors.New("INVALID_POST_TYPE")
+	ErrPostNotModeratable       = errors.New("POST_NOT_MODERATABLE")
+	ErrModerationReasonRequired = errors.New("MODERATION_REASON_REQUIRED")
+	ErrAdminOnly                = errors.New("ADMIN_ONLY")
+	ErrInvalidRegionID          = errors.New("INVALID_REGION_ID")
+	ErrInvalidJobID             = errors.New("INVALID_JOB_ID")
+	ErrInvalidSignupSource      = errors.New("INVALID_SIGNUP_SOURCE")
 )
 
 var (
@@ -74,45 +77,48 @@ var (
 )
 
 var ArabicMessages = map[string]string{
-	"INVALID_CREDENTIALS":        "البريد الإلكتروني أو كلمة المرور غير صحيحة",
-	"EMAIL_ALREADY_EXISTS":       "البريد الإلكتروني مستخدم بالفعل",
-	"INVALID_PHONE":              "رقم الهاتف غير صحيح",
-	"INVALID_OTP":                "رمز التحقق غير صحيح",
-	"OTP_EXPIRED":                "انتهت صلاحية رمز التحقق",
-	"SESSION_EXPIRED":            "تم تسجيل الدخول من جهاز آخر",
-	"UNAUTHORIZED":               "غير مصرح",
-	"ACCOUNT_NOT_ACTIVE":         "حسابك غير نشط",
-	"PENDING_REVIEW":             "حسابك قيد المراجعة - يمكنك تصفح الصفقات فقط",
-	"ADMIN_ONLY":                 "هذا الإجراء للمسؤولين فقط",
-	"INVALID_REGION_ID":          "المنطقة المحددة غير موجودة",
-	"INVALID_JOB_ID":             "المهنة المحددة غير موجودة",
-	"INVALID_SIGNUP_SOURCE":      "مصدر التسجيل غير صحيح",
-	"AUCTION_NOT_FOUND":          "الصفقة غير موجودة",
-	"AUCTION_NOT_ACTIVE":         "الصفقة غير نشطة",
-	"AUCTION_STILL_ACTIVE":       "الصفقة لا تزال نشطة - يمكنك اختيار الفائز بعد انتهاء الصفقة",
-	"AUCTION_EXPIRED":            "الصفقة منتهية",
-	"CANNOT_BID_OWN":             "لا يمكنك تقديم عرض على صفقتك",
-	"ALREADY_BID":                "لقد قدمت عرض بالفعل",
-	"MAX_BIDDERS":                "تم الوصول للحد الأقصى من المزايدين",
-	"MAX_ACTIVE_BIDS":            "لديك 3 عروض نشطة بالفعل",
-	"BID_BELOW_MINIMUM":          "السعر غير عادل",
-	"CANNOT_CANCEL_WITH_BIDS":    "لا يمكن إلغاء الصفقة بعد وجود عروض",
-	"MAX_CANCELLATIONS":          "وصلت للحد الأقصى للإلغاء (3 شهرياً)",
-	"NOT_AUCTION_OWNER":          "أنت لست صاحب الصفقة",
-	"SELECTION_WINDOW_EXPIRED":   "انتهت فترة الاختيار",
-	"INVALID_QUANTITY":           "الكمية المطلوبة غير صحيحة",
-	"ORDER_NOT_FOUND":            "الطلب غير موجود",
-	"NOT_ORDER_PARTICIPANT":      "أنت لست طرف في هذا الطلب",
-	"ALREADY_CONFIRMED":          "تم التأكيد بالفعل",
-	"ORDER_CONFIRMATION_EXPIRED": "انتهت مهلة تأكيد الطلب (30 دقيقة)",
-	"ORDER_ALREADY_EXPIRED":      "الطلب منتهي الصلاحية ومُلغى",
-	"MAX_OPEN_ISSUES":            "لديك 3 استفسارات مفتوحة بالفعل",
-	"INVALID_FILE_TYPE":          "نوع الملف غير مدعوم",
-	"FILE_TOO_LARGE":             "حجم الملف كبير جداً",
-	"NO_SUBSCRIPTION":            "ليس لديك اشتراك نشط - تواصل معنا للترقية",
-	"INSUFFICIENT_TIER":          "اشتراكك الحالي لا يسمح بهذا الإجراء - تواصل معنا للترقية",
-	"MONTHLY_LIMIT_REACHED":      "وصلت للحد الشهري المسموح به - تواصل معنا للترقية",
-	"STORAGE_UNAVAILABLE":        "الخدمة التخزينية غير متاحة",
+	"INVALID_CREDENTIALS":         "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+	"EMAIL_ALREADY_EXISTS":        "البريد الإلكتروني مستخدم بالفعل",
+	"INVALID_PHONE":               "رقم الهاتف غير صحيح",
+	"INVALID_OTP":                 "رمز التحقق غير صحيح",
+	"OTP_EXPIRED":                 "انتهت صلاحية رمز التحقق",
+	"SESSION_EXPIRED":             "تم تسجيل الدخول من جهاز آخر",
+	"UNAUTHORIZED":                "غير مصرح",
+	"ACCOUNT_NOT_ACTIVE":          "حسابك غير نشط",
+	"PENDING_REVIEW":              "حسابك قيد المراجعة - يمكنك تصفح الصفقات فقط",
+	"ADMIN_ONLY":                  "هذا الإجراء للمسؤولين فقط",
+	"INVALID_REGION_ID":           "المنطقة المحددة غير موجودة",
+	"INVALID_JOB_ID":              "المهنة المحددة غير موجودة",
+	"INVALID_SIGNUP_SOURCE":       "مصدر التسجيل غير صحيح",
+	"AUCTION_NOT_FOUND":           "الصفقة غير موجودة",
+	"INVALID_POST_TYPE":           "نوع المنشور غير صحيح",
+	"POST_NOT_MODERATABLE":        "المنشور غير موجود أو لا يمكن تنفيذ هذا الإجراء عليه",
+	"MODERATION_REASON_REQUIRED":  "يجب كتابة السبب",
+	"AUCTION_NOT_ACTIVE":          "الصفقة غير نشطة",
+	"AUCTION_STILL_ACTIVE":        "الصفقة لا تزال نشطة - يمكنك اختيار الفائز بعد انتهاء الصفقة",
+	"AUCTION_EXPIRED":             "الصفقة منتهية",
+	"CANNOT_BID_OWN":              "لا يمكنك تقديم عرض على صفقتك",
+	"ALREADY_BID":                 "لقد قدمت عرض بالفعل",
+	"MAX_BIDDERS":                 "تم الوصول للحد الأقصى من المزايدين",
+	"MAX_ACTIVE_BIDS":             "لديك 3 عروض نشطة بالفعل",
+	"BID_BELOW_MINIMUM":           "السعر غير عادل",
+	"CANNOT_CANCEL_WITH_BIDS":     "لا يمكن إلغاء الصفقة بعد وجود عروض",
+	"MAX_CANCELLATIONS":           "وصلت للحد الأقصى للإلغاء (3 شهرياً)",
+	"NOT_AUCTION_OWNER":           "أنت لست صاحب الصفقة",
+	"SELECTION_WINDOW_EXPIRED":    "انتهت فترة الاختيار",
+	"INVALID_QUANTITY":            "الكمية المطلوبة غير صحيحة",
+	"ORDER_NOT_FOUND":             "الطلب غير موجود",
+	"NOT_ORDER_PARTICIPANT":       "أنت لست طرف في هذا الطلب",
+	"ALREADY_CONFIRMED":           "تم التأكيد بالفعل",
+	"ORDER_CONFIRMATION_EXPIRED":  "انتهت مهلة تأكيد الطلب (30 دقيقة)",
+	"ORDER_ALREADY_EXPIRED":       "الطلب منتهي الصلاحية ومُلغى",
+	"MAX_OPEN_ISSUES":             "لديك 3 استفسارات مفتوحة بالفعل",
+	"INVALID_FILE_TYPE":           "نوع الملف غير مدعوم",
+	"FILE_TOO_LARGE":              "حجم الملف كبير جداً",
+	"NO_SUBSCRIPTION":             "ليس لديك اشتراك نشط - تواصل معنا للترقية",
+	"INSUFFICIENT_TIER":           "اشتراكك الحالي لا يسمح بهذا الإجراء - تواصل معنا للترقية",
+	"MONTHLY_LIMIT_REACHED":       "وصلت للحد الشهري المسموح به - تواصل معنا للترقية",
+	"STORAGE_UNAVAILABLE":         "الخدمة التخزينية غير متاحة",
 	"SUBSCRIPTION_ALREADY_EXISTS": "الاشتراك موجود بالفعل",
 	"SUBSCRIPTION_NOT_FOUND":      "الاشتراك غير موجود",
 	"INVALID_TIER":                "الباقة غير صحيحة",

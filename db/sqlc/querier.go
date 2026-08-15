@@ -33,6 +33,14 @@ type Querier interface {
 	AnalyticsUsersBySourceByDay(ctx context.Context, arg AnalyticsUsersBySourceByDayParams) ([]AnalyticsUsersBySourceByDayRow, error)
 	AnalyticsUsersByStatus(ctx context.Context) ([]AnalyticsUsersByStatusRow, error)
 	AnalyticsUsersCountByInterest(ctx context.Context) ([]AnalyticsUsersCountByInterestRow, error)
+	// end_time is set here, not at creation: the deal gets its full run from the
+	// moment it goes live, however long it waited in the queue. Also used to
+	// restore a suspended post, which is why 'suspended' is accepted too.
+	ApproveBuyRequest(ctx context.Context, arg ApproveBuyRequestParams) (BuyRequest, error)
+	// end_time is set here, not at creation: the deal gets its full run from the
+	// moment it goes live, however long it waited in the queue. Also used to
+	// restore a suspended post, which is why 'suspended' is accepted too.
+	ApproveSellAuction(ctx context.Context, arg ApproveSellAuctionParams) (SellAuction, error)
 	BanUser(ctx context.Context, arg BanUserParams) (int64, error)
 	CancelBuyRequest(ctx context.Context, id int32) error
 	CancelOrder(ctx context.Context, id int32) error
@@ -52,10 +60,14 @@ type Querier interface {
 	CountActiveSupplyOffersByUser(ctx context.Context, supplierID int32) (int64, error)
 	CountAllUsersAnyStatus(ctx context.Context) (int64, error)
 	CountBuyRequestsByOwner(ctx context.Context, ownerID int32) (int64, error)
+	CountModeratableBuyRequests(ctx context.Context) (int64, error)
+	CountModeratableSellAuctions(ctx context.Context) (int64, error)
 	CountMonthlyBuyCancellations(ctx context.Context, ownerID int32) (int64, error)
 	CountMonthlySellCancellations(ctx context.Context, ownerID int32) (int64, error)
 	CountOpenIssuesByUser(ctx context.Context, userID int32) (int64, error)
 	CountOrdersByUser(ctx context.Context, sellerID int32) (int64, error)
+	CountPendingApprovalBuyRequests(ctx context.Context) (int64, error)
+	CountPendingApprovalSellAuctions(ctx context.Context) (int64, error)
 	CountSearchBuyRequests(ctx context.Context, arg CountSearchBuyRequestsParams) (int64, error)
 	CountSearchSellAuctions(ctx context.Context, arg CountSearchSellAuctionsParams) (int64, error)
 	CountSellAuctionsByOwner(ctx context.Context, ownerID int32) (int64, error)
@@ -171,10 +183,16 @@ type Querier interface {
 	ListIssuesByUser(ctx context.Context, arg ListIssuesByUserParams) ([]Issue, error)
 	ListJobs(ctx context.Context) ([]Job, error)
 	ListLoginHistoryByUser(ctx context.Context, arg ListLoginHistoryByUserParams) ([]LoginHistory, error)
+	// Live and suspended posts, for the admin's "published" tab.
+	ListModeratableBuyRequests(ctx context.Context, arg ListModeratableBuyRequestsParams) ([]BuyRequest, error)
+	// Live and suspended posts, for the admin's "published" tab.
+	ListModeratableSellAuctions(ctx context.Context, arg ListModeratableSellAuctionsParams) ([]SellAuction, error)
 	ListNotificationsByUser(ctx context.Context, arg ListNotificationsByUserParams) ([]Notification, error)
 	ListOrdersByBuyRequest(ctx context.Context, buyRequestID pgtype.Int4) ([]Order, error)
 	ListOrdersBySellAuction(ctx context.Context, sellAuctionID pgtype.Int4) ([]Order, error)
 	ListOrdersByUser(ctx context.Context, arg ListOrdersByUserParams) ([]Order, error)
+	ListPendingApprovalBuyRequests(ctx context.Context, arg ListPendingApprovalBuyRequestsParams) ([]BuyRequest, error)
+	ListPendingApprovalSellAuctions(ctx context.Context, arg ListPendingApprovalSellAuctionsParams) ([]SellAuction, error)
 	ListRegions(ctx context.Context) ([]Region, error)
 	ListSellAuctionsByOwner(ctx context.Context, arg ListSellAuctionsByOwnerParams) ([]SellAuction, error)
 	ListSellBidsByAuction(ctx context.Context, auctionID int32) ([]ListSellBidsByAuctionRow, error)
@@ -193,6 +211,8 @@ type Querier interface {
 	MarkSellAuctionNotified(ctx context.Context, id int32) error
 	MarkSellAuctionSelectionWarned(ctx context.Context, id int32) error
 	ReactivateUserSubscription(ctx context.Context, arg ReactivateUserSubscriptionParams) (UserSubscription, error)
+	RejectBuyRequest(ctx context.Context, arg RejectBuyRequestParams) (BuyRequest, error)
+	RejectSellAuction(ctx context.Context, arg RejectSellAuctionParams) (SellAuction, error)
 	ResetMonthlyCounts(ctx context.Context) error
 	RevertBuyRequestToPendingSelection(ctx context.Context, id int32) error
 	RevertSellAuctionToPendingSelection(ctx context.Context, id int32) error
@@ -203,6 +223,8 @@ type Querier interface {
 	SelectSellBid(ctx context.Context, id int32) error
 	SelectSellWinner(ctx context.Context, arg SelectSellWinnerParams) error
 	SumAcceptedQuantityByRequest(ctx context.Context, buyRequestID int32) (pgtype.Numeric, error)
+	SuspendBuyRequest(ctx context.Context, arg SuspendBuyRequestParams) (BuyRequest, error)
+	SuspendSellAuction(ctx context.Context, arg SuspendSellAuctionParams) (SellAuction, error)
 	SuspendUser(ctx context.Context, arg SuspendUserParams) (int64, error)
 	UnbanUser(ctx context.Context, arg UnbanUserParams) (int64, error)
 	UnsuspendUser(ctx context.Context, arg UnsuspendUserParams) (int64, error)

@@ -33,6 +33,9 @@ type BuyRequest struct {
 	NotifiedAt             pgtype.Timestamptz `json:"notified_at"`
 	LastMotivationSentAt   pgtype.Timestamptz `json:"last_motivation_sent_at"`
 	SelectionWarningSentAt pgtype.Timestamptz `json:"selection_warning_sent_at"`
+	ModerationReason       pgtype.Text        `json:"moderation_reason"`
+	ModeratedByAdminID     pgtype.Int4        `json:"moderated_by_admin_id"`
+	ModeratedAt            pgtype.Timestamptz `json:"moderated_at"`
 }
 
 type DeviceToken struct {
@@ -201,6 +204,9 @@ type SellAuction struct {
 	NotifiedAt             pgtype.Timestamptz `json:"notified_at"`
 	LastMotivationSentAt   pgtype.Timestamptz `json:"last_motivation_sent_at"`
 	SelectionWarningSentAt pgtype.Timestamptz `json:"selection_warning_sent_at"`
+	ModerationReason       pgtype.Text        `json:"moderation_reason"`
+	ModeratedByAdminID     pgtype.Int4        `json:"moderated_by_admin_id"`
+	ModeratedAt            pgtype.Timestamptz `json:"moderated_at"`
 }
 
 type SellBid struct {

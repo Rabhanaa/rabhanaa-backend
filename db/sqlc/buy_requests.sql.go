@@ -11,9 +11,65 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const approveBuyRequest = `-- name: ApproveBuyRequest :one
+UPDATE buy_requests
+SET status = 'active',
+    end_time = NOW() + make_interval(hours => $1::int),
+    moderation_reason = NULL,
+    moderated_by_admin_id = $2::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = $3 AND status IN ('pending_approval','suspended')
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
+`
+
+type ApproveBuyRequestParams struct {
+	DurationHours int32       `json:"duration_hours"`
+	AdminID       int32       `json:"admin_id"`
+	PublicID      pgtype.UUID `json:"public_id"`
+}
+
+// end_time is set here, not at creation: the deal gets its full run from the
+// moment it goes live, however long it waited in the queue. Also used to
+// restore a suspended post, which is why 'suspended' is accepted too.
+func (q *Queries) ApproveBuyRequest(ctx context.Context, arg ApproveBuyRequestParams) (BuyRequest, error) {
+	row := q.db.QueryRow(ctx, approveBuyRequest, arg.DurationHours, arg.AdminID, arg.PublicID)
+	var i BuyRequest
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.OwnerID,
+		&i.RegionID,
+		&i.InterestID,
+		&i.Title,
+		&i.Description,
+		&i.ImageUrl,
+		&i.Unit,
+		&i.Quantity,
+		&i.BuyAllFromOne,
+		&i.OfferCount,
+		&i.AcceptedOfferCount,
+		&i.FulfilledQuantity,
+		&i.EndTime,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwnerName,
+		&i.RegionName,
+		&i.InterestName,
+		&i.NotifiedAt,
+		&i.LastMotivationSentAt,
+		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
+	)
+	return i, err
+}
+
 const cancelBuyRequest = `-- name: CancelBuyRequest :exec
 UPDATE buy_requests SET status = 'cancelled', updated_at = NOW()
-WHERE id = $1 AND status = 'active'
+WHERE id = $1 AND status IN ('active','pending_approval')
 `
 
 func (q *Queries) CancelBuyRequest(ctx context.Context, id int32) error {
@@ -61,6 +117,17 @@ func (q *Queries) CountBuyRequestsByOwner(ctx context.Context, ownerID int32) (i
 	return count, err
 }
 
+const countModeratableBuyRequests = `-- name: CountModeratableBuyRequests :one
+SELECT COUNT(*) FROM buy_requests WHERE status IN ('active','suspended')
+`
+
+func (q *Queries) CountModeratableBuyRequests(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countModeratableBuyRequests)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countMonthlyBuyCancellations = `-- name: CountMonthlyBuyCancellations :one
 SELECT COUNT(*) FROM buy_requests
 WHERE owner_id = $1 AND status = 'cancelled'
@@ -69,6 +136,17 @@ WHERE owner_id = $1 AND status = 'cancelled'
 
 func (q *Queries) CountMonthlyBuyCancellations(ctx context.Context, ownerID int32) (int64, error) {
 	row := q.db.QueryRow(ctx, countMonthlyBuyCancellations, ownerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPendingApprovalBuyRequests = `-- name: CountPendingApprovalBuyRequests :one
+SELECT COUNT(*) FROM buy_requests WHERE status = 'pending_approval'
+`
+
+func (q *Queries) CountPendingApprovalBuyRequests(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingApprovalBuyRequests)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -107,9 +185,9 @@ func (q *Queries) CountSearchBuyRequests(ctx context.Context, arg CountSearchBuy
 }
 
 const createBuyRequest = `-- name: CreateBuyRequest :one
-INSERT INTO buy_requests (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, end_time, owner_name, region_name, interest_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at
+INSERT INTO buy_requests (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, end_time, owner_name, region_name, interest_name, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
 `
 
 type CreateBuyRequestParams struct {
@@ -126,6 +204,7 @@ type CreateBuyRequestParams struct {
 	OwnerName     string             `json:"owner_name"`
 	RegionName    string             `json:"region_name"`
 	InterestName  string             `json:"interest_name"`
+	Status        string             `json:"status"`
 }
 
 func (q *Queries) CreateBuyRequest(ctx context.Context, arg CreateBuyRequestParams) (BuyRequest, error) {
@@ -143,6 +222,7 @@ func (q *Queries) CreateBuyRequest(ctx context.Context, arg CreateBuyRequestPara
 		arg.OwnerName,
 		arg.RegionName,
 		arg.InterestName,
+		arg.Status,
 	)
 	var i BuyRequest
 	err := row.Scan(
@@ -170,12 +250,15 @@ func (q *Queries) CreateBuyRequest(ctx context.Context, arg CreateBuyRequestPara
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getBuyRequestByID = `-- name: GetBuyRequestByID :one
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests WHERE id = $1
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests WHERE id = $1
 `
 
 func (q *Queries) GetBuyRequestByID(ctx context.Context, id int32) (BuyRequest, error) {
@@ -206,12 +289,15 @@ func (q *Queries) GetBuyRequestByID(ctx context.Context, id int32) (BuyRequest, 
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getBuyRequestByPublicID = `-- name: GetBuyRequestByPublicID :one
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests WHERE public_id = $1
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests WHERE public_id = $1
 `
 
 func (q *Queries) GetBuyRequestByPublicID(ctx context.Context, publicID pgtype.UUID) (BuyRequest, error) {
@@ -242,12 +328,15 @@ func (q *Queries) GetBuyRequestByPublicID(ctx context.Context, publicID pgtype.U
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getBuyRequestByPublicIDForUpdate = `-- name: GetBuyRequestByPublicIDForUpdate :one
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests WHERE public_id = $1 FOR UPDATE
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests WHERE public_id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetBuyRequestByPublicIDForUpdate(ctx context.Context, publicID pgtype.UUID) (BuyRequest, error) {
@@ -278,12 +367,15 @@ func (q *Queries) GetBuyRequestByPublicIDForUpdate(ctx context.Context, publicID
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getExpiredActiveBuyRequests = `-- name: GetExpiredActiveBuyRequests :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests WHERE status = 'active' AND end_time <= NOW()
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests WHERE status = 'active' AND end_time <= NOW()
 `
 
 func (q *Queries) GetExpiredActiveBuyRequests(ctx context.Context) ([]BuyRequest, error) {
@@ -320,6 +412,9 @@ func (q *Queries) GetExpiredActiveBuyRequests(ctx context.Context) ([]BuyRequest
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -332,7 +427,7 @@ func (q *Queries) GetExpiredActiveBuyRequests(ctx context.Context) ([]BuyRequest
 }
 
 const getExpiredPendingSelectionBuyRequests = `-- name: GetExpiredPendingSelectionBuyRequests :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests
 WHERE status = 'pending_selection'
   AND end_time + ($1::int * INTERVAL '1 hour') <= NOW()
 `
@@ -371,6 +466,9 @@ func (q *Queries) GetExpiredPendingSelectionBuyRequests(ctx context.Context, win
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -383,7 +481,7 @@ func (q *Queries) GetExpiredPendingSelectionBuyRequests(ctx context.Context, win
 }
 
 const getMotivatableActiveBuyRequests = `-- name: GetMotivatableActiveBuyRequests :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests
 WHERE status = 'active'
   AND end_time > NOW()
   AND end_time <= NOW() + INTERVAL '30 minutes'
@@ -424,6 +522,9 @@ func (q *Queries) GetMotivatableActiveBuyRequests(ctx context.Context) ([]BuyReq
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -436,7 +537,7 @@ func (q *Queries) GetMotivatableActiveBuyRequests(ctx context.Context) ([]BuyReq
 }
 
 const getSoonExpiringSelectionBuyRequests = `-- name: GetSoonExpiringSelectionBuyRequests :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests
 WHERE status = 'pending_selection'
   AND selection_warning_sent_at IS NULL
   AND NOW() >= end_time + ($1::int * INTERVAL '1 hour') - INTERVAL '1 hour'
@@ -478,6 +579,9 @@ func (q *Queries) GetSoonExpiringSelectionBuyRequests(ctx context.Context, windo
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -490,7 +594,7 @@ func (q *Queries) GetSoonExpiringSelectionBuyRequests(ctx context.Context, windo
 }
 
 const getUnnotifiedActiveBuyRequests = `-- name: GetUnnotifiedActiveBuyRequests :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests
 WHERE status = 'active' AND notified_at IS NULL
 `
 
@@ -528,6 +632,9 @@ func (q *Queries) GetUnnotifiedActiveBuyRequests(ctx context.Context) ([]BuyRequ
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -558,7 +665,7 @@ func (q *Queries) IncrementBuyRequestOfferCount(ctx context.Context, id int32) e
 }
 
 const listActiveBuyRequests = `-- name: ListActiveBuyRequests :many
-SELECT br.id, br.public_id, br.owner_id, br.region_id, br.interest_id, br.title, br.description, br.image_url, br.unit, br.quantity, br.buy_all_from_one, br.offer_count, br.accepted_offer_count, br.fulfilled_quantity, br.end_time, br.status, br.created_at, br.updated_at, br.owner_name, br.region_name, br.interest_name, br.notified_at, br.last_motivation_sent_at, br.selection_warning_sent_at FROM buy_requests br
+SELECT br.id, br.public_id, br.owner_id, br.region_id, br.interest_id, br.title, br.description, br.image_url, br.unit, br.quantity, br.buy_all_from_one, br.offer_count, br.accepted_offer_count, br.fulfilled_quantity, br.end_time, br.status, br.created_at, br.updated_at, br.owner_name, br.region_name, br.interest_name, br.notified_at, br.last_motivation_sent_at, br.selection_warning_sent_at, br.moderation_reason, br.moderated_by_admin_id, br.moderated_at FROM buy_requests br
 WHERE br.status = 'active' AND br.end_time > NOW()
   AND ($3::int IS NULL OR br.owner_id != $3::int)
   AND ($4::int[] IS NULL OR br.id NOT IN (
@@ -623,6 +730,9 @@ func (q *Queries) ListActiveBuyRequests(ctx context.Context, arg ListActiveBuyRe
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -635,7 +745,7 @@ func (q *Queries) ListActiveBuyRequests(ctx context.Context, arg ListActiveBuyRe
 }
 
 const listBuyRequestsByOwner = `-- name: ListBuyRequestsByOwner :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM buy_requests WHERE owner_id = $1
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests WHERE owner_id = $1
 ORDER BY created_at DESC LIMIT $2 OFFSET $3
 `
 
@@ -679,6 +789,130 @@ func (q *Queries) ListBuyRequestsByOwner(ctx context.Context, arg ListBuyRequest
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listModeratableBuyRequests = `-- name: ListModeratableBuyRequests :many
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests
+WHERE status IN ('active','suspended')
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListModeratableBuyRequestsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+// Live and suspended posts, for the admin's "published" tab.
+func (q *Queries) ListModeratableBuyRequests(ctx context.Context, arg ListModeratableBuyRequestsParams) ([]BuyRequest, error) {
+	rows, err := q.db.Query(ctx, listModeratableBuyRequests, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BuyRequest
+	for rows.Next() {
+		var i BuyRequest
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.OwnerID,
+			&i.RegionID,
+			&i.InterestID,
+			&i.Title,
+			&i.Description,
+			&i.ImageUrl,
+			&i.Unit,
+			&i.Quantity,
+			&i.BuyAllFromOne,
+			&i.OfferCount,
+			&i.AcceptedOfferCount,
+			&i.FulfilledQuantity,
+			&i.EndTime,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OwnerName,
+			&i.RegionName,
+			&i.InterestName,
+			&i.NotifiedAt,
+			&i.LastMotivationSentAt,
+			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingApprovalBuyRequests = `-- name: ListPendingApprovalBuyRequests :many
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM buy_requests
+WHERE status = 'pending_approval'
+ORDER BY created_at ASC
+LIMIT $1 OFFSET $2
+`
+
+type ListPendingApprovalBuyRequestsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListPendingApprovalBuyRequests(ctx context.Context, arg ListPendingApprovalBuyRequestsParams) ([]BuyRequest, error) {
+	rows, err := q.db.Query(ctx, listPendingApprovalBuyRequests, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BuyRequest
+	for rows.Next() {
+		var i BuyRequest
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.OwnerID,
+			&i.RegionID,
+			&i.InterestID,
+			&i.Title,
+			&i.Description,
+			&i.ImageUrl,
+			&i.Unit,
+			&i.Quantity,
+			&i.BuyAllFromOne,
+			&i.OfferCount,
+			&i.AcceptedOfferCount,
+			&i.FulfilledQuantity,
+			&i.EndTime,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OwnerName,
+			&i.RegionName,
+			&i.InterestName,
+			&i.NotifiedAt,
+			&i.LastMotivationSentAt,
+			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -717,6 +951,58 @@ func (q *Queries) MarkBuyRequestSelectionWarned(ctx context.Context, id int32) e
 	return err
 }
 
+const rejectBuyRequest = `-- name: RejectBuyRequest :one
+UPDATE buy_requests
+SET status = 'rejected',
+    moderation_reason = $1::text,
+    moderated_by_admin_id = $2::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = $3 AND status = 'pending_approval'
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
+`
+
+type RejectBuyRequestParams struct {
+	Reason   string      `json:"reason"`
+	AdminID  int32       `json:"admin_id"`
+	PublicID pgtype.UUID `json:"public_id"`
+}
+
+func (q *Queries) RejectBuyRequest(ctx context.Context, arg RejectBuyRequestParams) (BuyRequest, error) {
+	row := q.db.QueryRow(ctx, rejectBuyRequest, arg.Reason, arg.AdminID, arg.PublicID)
+	var i BuyRequest
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.OwnerID,
+		&i.RegionID,
+		&i.InterestID,
+		&i.Title,
+		&i.Description,
+		&i.ImageUrl,
+		&i.Unit,
+		&i.Quantity,
+		&i.BuyAllFromOne,
+		&i.OfferCount,
+		&i.AcceptedOfferCount,
+		&i.FulfilledQuantity,
+		&i.EndTime,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwnerName,
+		&i.RegionName,
+		&i.InterestName,
+		&i.NotifiedAt,
+		&i.LastMotivationSentAt,
+		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
+	)
+	return i, err
+}
+
 const revertBuyRequestToPendingSelection = `-- name: RevertBuyRequestToPendingSelection :exec
 UPDATE buy_requests 
 SET status = 'pending_selection', accepted_offer_count = 0, fulfilled_quantity = 0, updated_at = NOW()
@@ -729,7 +1015,7 @@ func (q *Queries) RevertBuyRequestToPendingSelection(ctx context.Context, id int
 }
 
 const searchBuyRequests = `-- name: SearchBuyRequests :many
-SELECT br.id, br.public_id, br.owner_id, br.region_id, br.interest_id, br.title, br.description, br.image_url, br.unit, br.quantity, br.buy_all_from_one, br.offer_count, br.accepted_offer_count, br.fulfilled_quantity, br.end_time, br.status, br.created_at, br.updated_at, br.owner_name, br.region_name, br.interest_name, br.notified_at, br.last_motivation_sent_at, br.selection_warning_sent_at FROM buy_requests br
+SELECT br.id, br.public_id, br.owner_id, br.region_id, br.interest_id, br.title, br.description, br.image_url, br.unit, br.quantity, br.buy_all_from_one, br.offer_count, br.accepted_offer_count, br.fulfilled_quantity, br.end_time, br.status, br.created_at, br.updated_at, br.owner_name, br.region_name, br.interest_name, br.notified_at, br.last_motivation_sent_at, br.selection_warning_sent_at, br.moderation_reason, br.moderated_by_admin_id, br.moderated_at FROM buy_requests br
 WHERE br.status = 'active' AND br.end_time > NOW()
   AND br.title ILIKE '%' || $3::text || '%'
   AND ($4::int IS NULL OR br.owner_id != $4::int)
@@ -797,6 +1083,9 @@ func (q *Queries) SearchBuyRequests(ctx context.Context, arg SearchBuyRequestsPa
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -806,6 +1095,58 @@ func (q *Queries) SearchBuyRequests(ctx context.Context, arg SearchBuyRequestsPa
 		return nil, err
 	}
 	return items, nil
+}
+
+const suspendBuyRequest = `-- name: SuspendBuyRequest :one
+UPDATE buy_requests
+SET status = 'suspended',
+    moderation_reason = $1::text,
+    moderated_by_admin_id = $2::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = $3 AND status = 'active'
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, offer_count, accepted_offer_count, fulfilled_quantity, end_time, status, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
+`
+
+type SuspendBuyRequestParams struct {
+	Reason   string      `json:"reason"`
+	AdminID  int32       `json:"admin_id"`
+	PublicID pgtype.UUID `json:"public_id"`
+}
+
+func (q *Queries) SuspendBuyRequest(ctx context.Context, arg SuspendBuyRequestParams) (BuyRequest, error) {
+	row := q.db.QueryRow(ctx, suspendBuyRequest, arg.Reason, arg.AdminID, arg.PublicID)
+	var i BuyRequest
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.OwnerID,
+		&i.RegionID,
+		&i.InterestID,
+		&i.Title,
+		&i.Description,
+		&i.ImageUrl,
+		&i.Unit,
+		&i.Quantity,
+		&i.BuyAllFromOne,
+		&i.OfferCount,
+		&i.AcceptedOfferCount,
+		&i.FulfilledQuantity,
+		&i.EndTime,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwnerName,
+		&i.RegionName,
+		&i.InterestName,
+		&i.NotifiedAt,
+		&i.LastMotivationSentAt,
+		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
+	)
+	return i, err
 }
 
 const updateBuyRequestFulfilledQuantity = `-- name: UpdateBuyRequestFulfilledQuantity :exec

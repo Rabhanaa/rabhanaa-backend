@@ -1,6 +1,6 @@
 -- name: CreateBuyRequest :one
-INSERT INTO buy_requests (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, end_time, owner_name, region_name, interest_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+INSERT INTO buy_requests (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, buy_all_from_one, end_time, owner_name, region_name, interest_name, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 RETURNING *;
 
 -- name: GetBuyRequestByID :one
@@ -79,7 +79,7 @@ UPDATE buy_requests SET fulfilled_quantity = $2, updated_at = NOW() WHERE id = $
 
 -- name: CancelBuyRequest :exec
 UPDATE buy_requests SET status = 'cancelled', updated_at = NOW()
-WHERE id = $1 AND status = 'active';
+WHERE id = $1 AND status IN ('active','pending_approval');
 
 -- name: GetExpiredActiveBuyRequests :many
 SELECT * FROM buy_requests WHERE status = 'active' AND end_time <= NOW();
@@ -126,3 +126,56 @@ WHERE status = 'active'
 
 -- name: MarkBuyRequestMotivated :exec
 UPDATE buy_requests SET last_motivation_sent_at = NOW() WHERE id = $1;
+
+-- name: ListPendingApprovalBuyRequests :many
+SELECT * FROM buy_requests
+WHERE status = 'pending_approval'
+ORDER BY created_at ASC
+LIMIT $1 OFFSET $2;
+
+-- name: CountPendingApprovalBuyRequests :one
+SELECT COUNT(*) FROM buy_requests WHERE status = 'pending_approval';
+
+-- name: ListModeratableBuyRequests :many
+-- Live and suspended posts, for the admin's "published" tab.
+SELECT * FROM buy_requests
+WHERE status IN ('active','suspended')
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2;
+
+-- name: CountModeratableBuyRequests :one
+SELECT COUNT(*) FROM buy_requests WHERE status IN ('active','suspended');
+
+-- name: ApproveBuyRequest :one
+-- end_time is set here, not at creation: the deal gets its full run from the
+-- moment it goes live, however long it waited in the queue. Also used to
+-- restore a suspended post, which is why 'suspended' is accepted too.
+UPDATE buy_requests
+SET status = 'active',
+    end_time = NOW() + make_interval(hours => @duration_hours::int),
+    moderation_reason = NULL,
+    moderated_by_admin_id = @admin_id::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = @public_id AND status IN ('pending_approval','suspended')
+RETURNING *;
+
+-- name: RejectBuyRequest :one
+UPDATE buy_requests
+SET status = 'rejected',
+    moderation_reason = @reason::text,
+    moderated_by_admin_id = @admin_id::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = @public_id AND status = 'pending_approval'
+RETURNING *;
+
+-- name: SuspendBuyRequest :one
+UPDATE buy_requests
+SET status = 'suspended',
+    moderation_reason = @reason::text,
+    moderated_by_admin_id = @admin_id::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = @public_id AND status = 'active'
+RETURNING *;

@@ -45,6 +45,7 @@ type AppContext struct {
 	SubscriptionAdminService *subscriptionSvcPkg.AdminService
 	UploadService            *uploadSvcPkg.UploadService
 	AnalyticsService         *analyticsSvcPkg.AnalyticsService
+	ModerationService        *auctionSvcPkg.ModerationService
 
 	// Repositories (for handlers that need direct access)
 	SellBidRepo     auctionRepoPkg.SellBidRepository
@@ -116,6 +117,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		uploadService,
 		cfg.DefaultImageURL,
 		cfg.RegionFilterEnabled,
+		cfg.PostApprovalEnabled,
 	)
 
 	buyRequestService := auctionSvcPkg.NewBuyRequestService(
@@ -126,6 +128,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		uploadService,
 		cfg.DefaultImageURL,
 		cfg.RegionFilterEnabled,
+		cfg.PostApprovalEnabled,
 	)
 
 	sellBiddingService := auctionSvcPkg.NewSellBiddingService(
@@ -181,6 +184,8 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		slog.Info("seeding disabled", "reason", "SEED_ENABLED=false")
 	}
 
+	moderationService := auctionSvcPkg.NewModerationService(queries, notificationService, cfg.AuctionDurationHours)
+
 	analyticsRepo := analyticsRepoPkg.NewRepository(queries)
 	analyticsService := analyticsSvcPkg.NewAnalyticsService(analyticsRepo)
 
@@ -217,6 +222,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		SubscriptionAdminService: subscriptionAdminSvc,
 		UploadService:            uploadService,
 		AnalyticsService:         analyticsService,
+		ModerationService:        moderationService,
 		SellBidRepo:              sellBidRepo,
 		SupplyOfferRepo:          supplyOfferRepo,
 	}, nil
@@ -240,6 +246,7 @@ type AppConfig struct {
 	SeedEnabled              bool
 	RequireDocuments         bool
 	RegionFilterEnabled      bool
+	PostApprovalEnabled      bool
 	FirebaseCredentialsPath  string
 	FirebaseCredentialsJSON  string
 	AppBaseURL               string
@@ -272,6 +279,7 @@ func LoadAppConfig() *AppConfig {
 		SeedEnabled:              getEnvAsBool("SEED_ENABLED", true),
 		RequireDocuments:         getEnvAsBool("REQUIRE_DOCUMENTS", false),
 		RegionFilterEnabled:      getEnvAsBool("REGION_FILTER_ENABLED", false),
+		PostApprovalEnabled:      getEnvAsBool("POST_APPROVAL_ENABLED", true),
 		FirebaseCredentialsPath:  getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseCredentialsJSON:  getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 		AppBaseURL:               getEnv("APP_BASE_URL", "http://localhost:8080"),

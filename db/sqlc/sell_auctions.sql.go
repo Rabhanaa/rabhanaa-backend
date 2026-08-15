@@ -11,9 +11,67 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const approveSellAuction = `-- name: ApproveSellAuction :one
+UPDATE sell_auctions
+SET status = 'active',
+    end_time = NOW() + make_interval(hours => $1::int),
+    moderation_reason = NULL,
+    moderated_by_admin_id = $2::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = $3 AND status IN ('pending_approval','suspended')
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
+`
+
+type ApproveSellAuctionParams struct {
+	DurationHours int32       `json:"duration_hours"`
+	AdminID       int32       `json:"admin_id"`
+	PublicID      pgtype.UUID `json:"public_id"`
+}
+
+// end_time is set here, not at creation: the deal gets its full run from the
+// moment it goes live, however long it waited in the queue. Also used to
+// restore a suspended post, which is why 'suspended' is accepted too.
+func (q *Queries) ApproveSellAuction(ctx context.Context, arg ApproveSellAuctionParams) (SellAuction, error) {
+	row := q.db.QueryRow(ctx, approveSellAuction, arg.DurationHours, arg.AdminID, arg.PublicID)
+	var i SellAuction
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.OwnerID,
+		&i.RegionID,
+		&i.InterestID,
+		&i.Title,
+		&i.Description,
+		&i.ImageUrl,
+		&i.Unit,
+		&i.Quantity,
+		&i.UnitPrice,
+		&i.BuyAllFromOne,
+		&i.BidCount,
+		&i.EndTime,
+		&i.Status,
+		&i.SelectedBidID,
+		&i.WinnerID,
+		&i.FinalPrice,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwnerName,
+		&i.RegionName,
+		&i.InterestName,
+		&i.NotifiedAt,
+		&i.LastMotivationSentAt,
+		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
+	)
+	return i, err
+}
+
 const cancelSellAuction = `-- name: CancelSellAuction :exec
 UPDATE sell_auctions SET status = 'cancelled', updated_at = NOW()
-WHERE id = $1 AND status = 'active'
+WHERE id = $1 AND status IN ('active','pending_approval')
 `
 
 func (q *Queries) CancelSellAuction(ctx context.Context, id int32) error {
@@ -50,6 +108,17 @@ func (q *Queries) CountActiveSellAuctions(ctx context.Context, arg CountActiveSe
 	return count, err
 }
 
+const countModeratableSellAuctions = `-- name: CountModeratableSellAuctions :one
+SELECT COUNT(*) FROM sell_auctions WHERE status IN ('active','suspended')
+`
+
+func (q *Queries) CountModeratableSellAuctions(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countModeratableSellAuctions)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countMonthlySellCancellations = `-- name: CountMonthlySellCancellations :one
 SELECT COUNT(*) FROM sell_auctions
 WHERE owner_id = $1 AND status = 'cancelled'
@@ -58,6 +127,17 @@ WHERE owner_id = $1 AND status = 'cancelled'
 
 func (q *Queries) CountMonthlySellCancellations(ctx context.Context, ownerID int32) (int64, error) {
 	row := q.db.QueryRow(ctx, countMonthlySellCancellations, ownerID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countPendingApprovalSellAuctions = `-- name: CountPendingApprovalSellAuctions :one
+SELECT COUNT(*) FROM sell_auctions WHERE status = 'pending_approval'
+`
+
+func (q *Queries) CountPendingApprovalSellAuctions(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingApprovalSellAuctions)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -107,9 +187,9 @@ func (q *Queries) CountSellAuctionsByOwner(ctx context.Context, ownerID int32) (
 }
 
 const createSellAuction = `-- name: CreateSellAuction :one
-INSERT INTO sell_auctions (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, end_time, owner_name, region_name, interest_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at
+INSERT INTO sell_auctions (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, end_time, owner_name, region_name, interest_name, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
 `
 
 type CreateSellAuctionParams struct {
@@ -127,6 +207,7 @@ type CreateSellAuctionParams struct {
 	OwnerName     string             `json:"owner_name"`
 	RegionName    string             `json:"region_name"`
 	InterestName  string             `json:"interest_name"`
+	Status        string             `json:"status"`
 }
 
 func (q *Queries) CreateSellAuction(ctx context.Context, arg CreateSellAuctionParams) (SellAuction, error) {
@@ -145,6 +226,7 @@ func (q *Queries) CreateSellAuction(ctx context.Context, arg CreateSellAuctionPa
 		arg.OwnerName,
 		arg.RegionName,
 		arg.InterestName,
+		arg.Status,
 	)
 	var i SellAuction
 	err := row.Scan(
@@ -174,12 +256,15 @@ func (q *Queries) CreateSellAuction(ctx context.Context, arg CreateSellAuctionPa
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getExpiredActiveSellAuctions = `-- name: GetExpiredActiveSellAuctions :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions WHERE status = 'active' AND end_time <= NOW()
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions WHERE status = 'active' AND end_time <= NOW()
 `
 
 func (q *Queries) GetExpiredActiveSellAuctions(ctx context.Context) ([]SellAuction, error) {
@@ -218,6 +303,9 @@ func (q *Queries) GetExpiredActiveSellAuctions(ctx context.Context) ([]SellAucti
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -230,7 +318,7 @@ func (q *Queries) GetExpiredActiveSellAuctions(ctx context.Context) ([]SellAucti
 }
 
 const getExpiredPendingSelectionSellAuctions = `-- name: GetExpiredPendingSelectionSellAuctions :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions
 WHERE status = 'pending_selection'
   AND end_time + ($1::int * INTERVAL '1 hour') <= NOW()
 `
@@ -271,6 +359,9 @@ func (q *Queries) GetExpiredPendingSelectionSellAuctions(ctx context.Context, wi
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -283,7 +374,7 @@ func (q *Queries) GetExpiredPendingSelectionSellAuctions(ctx context.Context, wi
 }
 
 const getMotivatableActiveSellAuctions = `-- name: GetMotivatableActiveSellAuctions :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions
 WHERE status = 'active'
   AND end_time > NOW()
   AND end_time <= NOW() + INTERVAL '30 minutes'
@@ -326,6 +417,9 @@ func (q *Queries) GetMotivatableActiveSellAuctions(ctx context.Context) ([]SellA
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -338,7 +432,7 @@ func (q *Queries) GetMotivatableActiveSellAuctions(ctx context.Context) ([]SellA
 }
 
 const getSellAuctionByID = `-- name: GetSellAuctionByID :one
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions WHERE id = $1
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions WHERE id = $1
 `
 
 func (q *Queries) GetSellAuctionByID(ctx context.Context, id int32) (SellAuction, error) {
@@ -371,12 +465,15 @@ func (q *Queries) GetSellAuctionByID(ctx context.Context, id int32) (SellAuction
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getSellAuctionByPublicID = `-- name: GetSellAuctionByPublicID :one
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions WHERE public_id = $1
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions WHERE public_id = $1
 `
 
 func (q *Queries) GetSellAuctionByPublicID(ctx context.Context, publicID pgtype.UUID) (SellAuction, error) {
@@ -409,12 +506,15 @@ func (q *Queries) GetSellAuctionByPublicID(ctx context.Context, publicID pgtype.
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getSellAuctionByPublicIDForUpdate = `-- name: GetSellAuctionByPublicIDForUpdate :one
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions WHERE public_id = $1 FOR UPDATE
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions WHERE public_id = $1 FOR UPDATE
 `
 
 func (q *Queries) GetSellAuctionByPublicIDForUpdate(ctx context.Context, publicID pgtype.UUID) (SellAuction, error) {
@@ -447,12 +547,15 @@ func (q *Queries) GetSellAuctionByPublicIDForUpdate(ctx context.Context, publicI
 		&i.NotifiedAt,
 		&i.LastMotivationSentAt,
 		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
 	)
 	return i, err
 }
 
 const getSoonExpiringSelectionSellAuctions = `-- name: GetSoonExpiringSelectionSellAuctions :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions
 WHERE status = 'pending_selection'
   AND selection_warning_sent_at IS NULL
   AND NOW() >= end_time + ($1::int * INTERVAL '1 hour') - INTERVAL '1 hour'
@@ -496,6 +599,9 @@ func (q *Queries) GetSoonExpiringSelectionSellAuctions(ctx context.Context, wind
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -508,7 +614,7 @@ func (q *Queries) GetSoonExpiringSelectionSellAuctions(ctx context.Context, wind
 }
 
 const getUnnotifiedActiveSellAuctions = `-- name: GetUnnotifiedActiveSellAuctions :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions
 WHERE status = 'active' AND notified_at IS NULL
 `
 
@@ -548,6 +654,9 @@ func (q *Queries) GetUnnotifiedActiveSellAuctions(ctx context.Context) ([]SellAu
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -569,7 +678,7 @@ func (q *Queries) IncrementSellAuctionBidCount(ctx context.Context, id int32) er
 }
 
 const listActiveSellAuctions = `-- name: ListActiveSellAuctions :many
-SELECT sa.id, sa.public_id, sa.owner_id, sa.region_id, sa.interest_id, sa.title, sa.description, sa.image_url, sa.unit, sa.quantity, sa.unit_price, sa.buy_all_from_one, sa.bid_count, sa.end_time, sa.status, sa.selected_bid_id, sa.winner_id, sa.final_price, sa.created_at, sa.updated_at, sa.owner_name, sa.region_name, sa.interest_name, sa.notified_at, sa.last_motivation_sent_at, sa.selection_warning_sent_at FROM sell_auctions sa
+SELECT sa.id, sa.public_id, sa.owner_id, sa.region_id, sa.interest_id, sa.title, sa.description, sa.image_url, sa.unit, sa.quantity, sa.unit_price, sa.buy_all_from_one, sa.bid_count, sa.end_time, sa.status, sa.selected_bid_id, sa.winner_id, sa.final_price, sa.created_at, sa.updated_at, sa.owner_name, sa.region_name, sa.interest_name, sa.notified_at, sa.last_motivation_sent_at, sa.selection_warning_sent_at, sa.moderation_reason, sa.moderated_by_admin_id, sa.moderated_at FROM sell_auctions sa
 WHERE sa.status = 'active' AND sa.end_time > NOW()
   AND ($3::int IS NULL OR sa.owner_id != $3::int)
   AND ($4::int[] IS NULL OR sa.id NOT IN (
@@ -636,6 +745,134 @@ func (q *Queries) ListActiveSellAuctions(ctx context.Context, arg ListActiveSell
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listModeratableSellAuctions = `-- name: ListModeratableSellAuctions :many
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions
+WHERE status IN ('active','suspended')
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListModeratableSellAuctionsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+// Live and suspended posts, for the admin's "published" tab.
+func (q *Queries) ListModeratableSellAuctions(ctx context.Context, arg ListModeratableSellAuctionsParams) ([]SellAuction, error) {
+	rows, err := q.db.Query(ctx, listModeratableSellAuctions, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SellAuction
+	for rows.Next() {
+		var i SellAuction
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.OwnerID,
+			&i.RegionID,
+			&i.InterestID,
+			&i.Title,
+			&i.Description,
+			&i.ImageUrl,
+			&i.Unit,
+			&i.Quantity,
+			&i.UnitPrice,
+			&i.BuyAllFromOne,
+			&i.BidCount,
+			&i.EndTime,
+			&i.Status,
+			&i.SelectedBidID,
+			&i.WinnerID,
+			&i.FinalPrice,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OwnerName,
+			&i.RegionName,
+			&i.InterestName,
+			&i.NotifiedAt,
+			&i.LastMotivationSentAt,
+			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingApprovalSellAuctions = `-- name: ListPendingApprovalSellAuctions :many
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions
+WHERE status = 'pending_approval'
+ORDER BY created_at ASC
+LIMIT $1 OFFSET $2
+`
+
+type ListPendingApprovalSellAuctionsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+func (q *Queries) ListPendingApprovalSellAuctions(ctx context.Context, arg ListPendingApprovalSellAuctionsParams) ([]SellAuction, error) {
+	rows, err := q.db.Query(ctx, listPendingApprovalSellAuctions, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SellAuction
+	for rows.Next() {
+		var i SellAuction
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.OwnerID,
+			&i.RegionID,
+			&i.InterestID,
+			&i.Title,
+			&i.Description,
+			&i.ImageUrl,
+			&i.Unit,
+			&i.Quantity,
+			&i.UnitPrice,
+			&i.BuyAllFromOne,
+			&i.BidCount,
+			&i.EndTime,
+			&i.Status,
+			&i.SelectedBidID,
+			&i.WinnerID,
+			&i.FinalPrice,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.OwnerName,
+			&i.RegionName,
+			&i.InterestName,
+			&i.NotifiedAt,
+			&i.LastMotivationSentAt,
+			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -648,7 +885,7 @@ func (q *Queries) ListActiveSellAuctions(ctx context.Context, arg ListActiveSell
 }
 
 const listSellAuctionsByOwner = `-- name: ListSellAuctionsByOwner :many
-SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at FROM sell_auctions WHERE owner_id = $1
+SELECT id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at FROM sell_auctions WHERE owner_id = $1
 ORDER BY created_at DESC LIMIT $2 OFFSET $3
 `
 
@@ -694,6 +931,9 @@ func (q *Queries) ListSellAuctionsByOwner(ctx context.Context, arg ListSellAucti
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -732,6 +972,60 @@ func (q *Queries) MarkSellAuctionSelectionWarned(ctx context.Context, id int32) 
 	return err
 }
 
+const rejectSellAuction = `-- name: RejectSellAuction :one
+UPDATE sell_auctions
+SET status = 'rejected',
+    moderation_reason = $1::text,
+    moderated_by_admin_id = $2::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = $3 AND status = 'pending_approval'
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
+`
+
+type RejectSellAuctionParams struct {
+	Reason   string      `json:"reason"`
+	AdminID  int32       `json:"admin_id"`
+	PublicID pgtype.UUID `json:"public_id"`
+}
+
+func (q *Queries) RejectSellAuction(ctx context.Context, arg RejectSellAuctionParams) (SellAuction, error) {
+	row := q.db.QueryRow(ctx, rejectSellAuction, arg.Reason, arg.AdminID, arg.PublicID)
+	var i SellAuction
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.OwnerID,
+		&i.RegionID,
+		&i.InterestID,
+		&i.Title,
+		&i.Description,
+		&i.ImageUrl,
+		&i.Unit,
+		&i.Quantity,
+		&i.UnitPrice,
+		&i.BuyAllFromOne,
+		&i.BidCount,
+		&i.EndTime,
+		&i.Status,
+		&i.SelectedBidID,
+		&i.WinnerID,
+		&i.FinalPrice,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwnerName,
+		&i.RegionName,
+		&i.InterestName,
+		&i.NotifiedAt,
+		&i.LastMotivationSentAt,
+		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
+	)
+	return i, err
+}
+
 const revertSellAuctionToPendingSelection = `-- name: RevertSellAuctionToPendingSelection :exec
 UPDATE sell_auctions 
 SET status = 'pending_selection', selected_bid_id = NULL, winner_id = NULL, final_price = NULL, updated_at = NOW()
@@ -744,7 +1038,7 @@ func (q *Queries) RevertSellAuctionToPendingSelection(ctx context.Context, id in
 }
 
 const searchSellAuctions = `-- name: SearchSellAuctions :many
-SELECT sa.id, sa.public_id, sa.owner_id, sa.region_id, sa.interest_id, sa.title, sa.description, sa.image_url, sa.unit, sa.quantity, sa.unit_price, sa.buy_all_from_one, sa.bid_count, sa.end_time, sa.status, sa.selected_bid_id, sa.winner_id, sa.final_price, sa.created_at, sa.updated_at, sa.owner_name, sa.region_name, sa.interest_name, sa.notified_at, sa.last_motivation_sent_at, sa.selection_warning_sent_at FROM sell_auctions sa
+SELECT sa.id, sa.public_id, sa.owner_id, sa.region_id, sa.interest_id, sa.title, sa.description, sa.image_url, sa.unit, sa.quantity, sa.unit_price, sa.buy_all_from_one, sa.bid_count, sa.end_time, sa.status, sa.selected_bid_id, sa.winner_id, sa.final_price, sa.created_at, sa.updated_at, sa.owner_name, sa.region_name, sa.interest_name, sa.notified_at, sa.last_motivation_sent_at, sa.selection_warning_sent_at, sa.moderation_reason, sa.moderated_by_admin_id, sa.moderated_at FROM sell_auctions sa
 WHERE sa.status = 'active' AND sa.end_time > NOW()
   AND sa.title ILIKE '%' || $3::text || '%'
   AND ($4::int IS NULL OR sa.owner_id != $4::int)
@@ -814,6 +1108,9 @@ func (q *Queries) SearchSellAuctions(ctx context.Context, arg SearchSellAuctions
 			&i.NotifiedAt,
 			&i.LastMotivationSentAt,
 			&i.SelectionWarningSentAt,
+			&i.ModerationReason,
+			&i.ModeratedByAdminID,
+			&i.ModeratedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -846,6 +1143,60 @@ func (q *Queries) SelectSellWinner(ctx context.Context, arg SelectSellWinnerPara
 		arg.FinalPrice,
 	)
 	return err
+}
+
+const suspendSellAuction = `-- name: SuspendSellAuction :one
+UPDATE sell_auctions
+SET status = 'suspended',
+    moderation_reason = $1::text,
+    moderated_by_admin_id = $2::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = $3 AND status = 'active'
+RETURNING id, public_id, owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, bid_count, end_time, status, selected_bid_id, winner_id, final_price, created_at, updated_at, owner_name, region_name, interest_name, notified_at, last_motivation_sent_at, selection_warning_sent_at, moderation_reason, moderated_by_admin_id, moderated_at
+`
+
+type SuspendSellAuctionParams struct {
+	Reason   string      `json:"reason"`
+	AdminID  int32       `json:"admin_id"`
+	PublicID pgtype.UUID `json:"public_id"`
+}
+
+func (q *Queries) SuspendSellAuction(ctx context.Context, arg SuspendSellAuctionParams) (SellAuction, error) {
+	row := q.db.QueryRow(ctx, suspendSellAuction, arg.Reason, arg.AdminID, arg.PublicID)
+	var i SellAuction
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.OwnerID,
+		&i.RegionID,
+		&i.InterestID,
+		&i.Title,
+		&i.Description,
+		&i.ImageUrl,
+		&i.Unit,
+		&i.Quantity,
+		&i.UnitPrice,
+		&i.BuyAllFromOne,
+		&i.BidCount,
+		&i.EndTime,
+		&i.Status,
+		&i.SelectedBidID,
+		&i.WinnerID,
+		&i.FinalPrice,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OwnerName,
+		&i.RegionName,
+		&i.InterestName,
+		&i.NotifiedAt,
+		&i.LastMotivationSentAt,
+		&i.SelectionWarningSentAt,
+		&i.ModerationReason,
+		&i.ModeratedByAdminID,
+		&i.ModeratedAt,
+	)
+	return i, err
 }
 
 const updateSellAuctionStatus = `-- name: UpdateSellAuctionStatus :exec

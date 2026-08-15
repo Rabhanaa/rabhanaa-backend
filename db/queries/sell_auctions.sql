@@ -1,6 +1,6 @@
 -- name: CreateSellAuction :one
-INSERT INTO sell_auctions (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, end_time, owner_name, region_name, interest_name)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+INSERT INTO sell_auctions (owner_id, region_id, interest_id, title, description, image_url, unit, quantity, unit_price, buy_all_from_one, end_time, owner_name, region_name, interest_name, status)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 RETURNING *;
 
 -- name: GetSellAuctionByID :one
@@ -78,7 +78,7 @@ WHERE id = $1;
 
 -- name: CancelSellAuction :exec
 UPDATE sell_auctions SET status = 'cancelled', updated_at = NOW()
-WHERE id = $1 AND status = 'active';
+WHERE id = $1 AND status IN ('active','pending_approval');
 
 -- name: GetExpiredActiveSellAuctions :many
 SELECT * FROM sell_auctions WHERE status = 'active' AND end_time <= NOW();
@@ -125,3 +125,56 @@ WHERE status = 'active'
 
 -- name: MarkSellAuctionMotivated :exec
 UPDATE sell_auctions SET last_motivation_sent_at = NOW() WHERE id = $1;
+
+-- name: ListPendingApprovalSellAuctions :many
+SELECT * FROM sell_auctions
+WHERE status = 'pending_approval'
+ORDER BY created_at ASC
+LIMIT $1 OFFSET $2;
+
+-- name: CountPendingApprovalSellAuctions :one
+SELECT COUNT(*) FROM sell_auctions WHERE status = 'pending_approval';
+
+-- name: ListModeratableSellAuctions :many
+-- Live and suspended posts, for the admin's "published" tab.
+SELECT * FROM sell_auctions
+WHERE status IN ('active','suspended')
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2;
+
+-- name: CountModeratableSellAuctions :one
+SELECT COUNT(*) FROM sell_auctions WHERE status IN ('active','suspended');
+
+-- name: ApproveSellAuction :one
+-- end_time is set here, not at creation: the deal gets its full run from the
+-- moment it goes live, however long it waited in the queue. Also used to
+-- restore a suspended post, which is why 'suspended' is accepted too.
+UPDATE sell_auctions
+SET status = 'active',
+    end_time = NOW() + make_interval(hours => @duration_hours::int),
+    moderation_reason = NULL,
+    moderated_by_admin_id = @admin_id::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = @public_id AND status IN ('pending_approval','suspended')
+RETURNING *;
+
+-- name: RejectSellAuction :one
+UPDATE sell_auctions
+SET status = 'rejected',
+    moderation_reason = @reason::text,
+    moderated_by_admin_id = @admin_id::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = @public_id AND status = 'pending_approval'
+RETURNING *;
+
+-- name: SuspendSellAuction :one
+UPDATE sell_auctions
+SET status = 'suspended',
+    moderation_reason = @reason::text,
+    moderated_by_admin_id = @admin_id::int,
+    moderated_at = NOW(),
+    updated_at = NOW()
+WHERE public_id = @public_id AND status = 'active'
+RETURNING *;

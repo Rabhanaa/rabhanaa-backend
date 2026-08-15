@@ -27,6 +27,7 @@ type SellAuctionService struct {
 	uploadService      UploadService
 	defaultImageURL    string
 	regionFilter       bool
+	postApproval       bool
 }
 
 type NotificationSender interface {
@@ -46,6 +47,7 @@ func NewSellAuctionService(
 	uploadService UploadService,
 	defaultImageURL string,
 	regionFilter bool,
+	postApproval bool,
 ) *SellAuctionService {
 	duration := time.Duration(auctionDurationHours) * time.Hour
 	if duration == 0 {
@@ -59,6 +61,7 @@ func NewSellAuctionService(
 		uploadService:      uploadService,
 		defaultImageURL:    defaultImageURL,
 		regionFilter:       regionFilter,
+		postApproval:       postApproval,
 	}
 }
 
@@ -161,6 +164,7 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 		OwnerName:     user.Name,
 		RegionName:    region.NameAr,
 		InterestName:  interest.NameAr,
+		Status:        s.initialStatus(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create auction: %w", err)
@@ -228,6 +232,13 @@ func (s *SellAuctionService) GetSellAuctionDetail(ctx context.Context, auctionPu
 			return nil, errs.ErrAuctionNotFound
 		}
 		return nil, fmt.Errorf("failed to get auction: %w", err)
+	}
+
+	// A post that is not live is visible only to its owner (an admin reaches it
+	// through the moderation endpoints), so a rejected or suspended post is not
+	// still reachable by anyone holding the link.
+	if auction.Status != "active" && auction.OwnerID != requestingUserID {
+		return nil, errs.ErrAuctionNotFound
 	}
 
 	return s.toResponse(auction, requestingUserID), nil
@@ -388,4 +399,14 @@ func (s *SellAuctionService) viewerRegion(ctx context.Context, userID int32) int
 		return 0
 	}
 	return user.RegionID.Int32
+}
+
+// initialStatus decides whether a new post goes live immediately or waits for an
+// admin. end_time is still written at creation because the column is NOT NULL,
+// but it is recomputed on approval — nothing reads it while the post is not active.
+func (s *SellAuctionService) initialStatus() string {
+	if s.postApproval {
+		return "pending_approval"
+	}
+	return "active"
 }

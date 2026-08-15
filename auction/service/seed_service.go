@@ -175,6 +175,8 @@ func (s *SeedService) SeedAuctions(ctx context.Context) error {
 			OwnerName:     seedUser.Name,
 			RegionName:    region.NameAr,
 			InterestName:  interest.NameAr,
+			// Demo listings bypass moderation — 60 an hour would bury the queue.
+			Status: "active",
 		}
 
 		if _, err := s.queries.CreateSellAuction(ctx, params); err != nil {
@@ -207,6 +209,8 @@ func (s *SeedService) SeedAuctions(ctx context.Context) error {
 			OwnerName:     seedUser.Name,
 			RegionName:    region.NameAr,
 			InterestName:  interest.NameAr,
+			// Demo listings bypass moderation — 60 an hour would bury the queue.
+			Status: "active",
 		}
 
 		if _, err := s.queries.CreateBuyRequest(ctx, params); err != nil {

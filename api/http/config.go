@@ -32,6 +32,7 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		"support_phone":                 h.config.SupportPhone,
 		"require_documents":             h.config.RequireDocuments,
 		"region_filter_enabled":         h.config.RegionFilterEnabled,
+		"post_approval_enabled":         h.config.PostApprovalEnabled,
 		"units":                         []string{"kg", "ton", "piece", "box"},
 	})
 }

@@ -77,6 +77,7 @@ docker run --env-file .env -p 8080:8080 rabhana-api
 | `SEED_ENABLED`                    | `true`  |
 | `REQUIRE_DOCUMENTS`               | `false` |
 | `REGION_FILTER_ENABLED`           | `false` |
+| `POST_APPROVAL_ENABLED`           | `true`  |
 
 ### Integrations (optional)
 
