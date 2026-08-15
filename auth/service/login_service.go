@@ -89,6 +89,7 @@ func (s *AuthService) Login(ctx context.Context, req model.LoginRequest, deviceI
 			Status:           user.Status,
 			IsAdmin:          user.Role.Valid && user.Role.String == "admin",
 			SuppliesToRetail: user.SuppliesToRetail,
+			JobKey:           user.JobKey,
 		},
 	}, nil
 }

@@ -320,6 +320,7 @@ type User struct {
 	StatusChangedAt        pgtype.Timestamptz `json:"status_changed_at"`
 	SuppliesToRetail       bool               `json:"supplies_to_retail"`
 	PasswordChangedAt      pgtype.Timestamptz `json:"password_changed_at"`
+	JobKey                 string             `json:"job_key"`
 }
 
 type UserDocument struct {

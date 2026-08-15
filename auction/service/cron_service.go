@@ -235,6 +235,9 @@ func (c *CronService) processMotivationalMessages(ctx context.Context) {
 				InterestID:     auction.InterestID,
 				ExcludeUserID:  auction.OwnerID,
 				FilterRegionID: c.notifyRegion(auction.RegionID),
+				// Retailers only see supply-side sellers, so only tell them when
+				// the poster is one.
+				ExcludeRetailers: !c.ownerIsSupplySide(ctx, auction.OwnerID),
 			})
 			if err != nil {
 				slog.Error("failed to get interested users for motivation", "error", err, "auction_id", auction.ID)
@@ -263,6 +266,8 @@ func (c *CronService) processMotivationalMessages(ctx context.Context) {
 			InterestID:     request.InterestID,
 			ExcludeUserID:  request.OwnerID,
 			FilterRegionID: c.notifyRegion(request.RegionID),
+			// Retailers cannot supply a buy request.
+			ExcludeRetailers: true,
 		})
 		if err != nil {
 			slog.Error("failed to get interested users for motivation", "error", err, "request_id", request.ID)
@@ -323,6 +328,8 @@ func (c *CronService) processNewListings(ctx context.Context) {
 			InterestID:     auction.InterestID,
 			ExcludeUserID:  auction.OwnerID,
 			FilterRegionID: c.notifyRegion(auction.RegionID),
+			// See above — notifications follow what the retailer feed shows.
+			ExcludeRetailers: !c.ownerIsSupplySide(ctx, auction.OwnerID),
 		})
 		if err != nil {
 			slog.Error("failed to get active users by interest for sell auction", "error", err, "auction_id", auction.ID)
@@ -352,6 +359,8 @@ func (c *CronService) processNewListings(ctx context.Context) {
 			InterestID:     request.InterestID,
 			ExcludeUserID:  request.OwnerID,
 			FilterRegionID: c.notifyRegion(request.RegionID),
+			// Retailers cannot supply a buy request.
+			ExcludeRetailers: true,
 		})
 		if err != nil {
 			slog.Error("failed to get active users by interest for buy request", "error", err, "request_id", request.ID)
@@ -377,4 +386,16 @@ func (c *CronService) notifyRegion(postRegionID int32) int32 {
 		return postRegionID
 	}
 	return 0
+}
+
+// ownerIsSupplySide reports whether a post's owner is a role retailers can see.
+// The post rows cache owner_name but not the owner's role, so this is a small
+// indexed lookup per post being broadcast.
+func (c *CronService) ownerIsSupplySide(ctx context.Context, ownerID int32) bool {
+	owner, err := c.queries.GetUserByID(ctx, ownerID)
+	if err != nil {
+		slog.Error("failed to load post owner for notification scoping", "error", err, "owner_id", ownerID)
+		return false
+	}
+	return isSupplySideRole(owner.JobKey)
 }

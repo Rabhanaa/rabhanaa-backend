@@ -86,6 +86,7 @@ SET
     job_id = $2,
     region_id = $3,
     job_name = COALESCE((SELECT j.name_ar FROM jobs j WHERE j.id = $2), ''),
+    job_key = COALESCE((SELECT j.key FROM jobs j WHERE j.id = $2), ''),
     region_name = COALESCE((SELECT r.name_ar FROM regions r WHERE r.id = $3), ''),
     updated_at = NOW()
 WHERE users.id = $1;
@@ -94,6 +95,7 @@ WHERE users.id = $1;
 UPDATE users
 SET 
     job_name = COALESCE((SELECT j.name_ar FROM jobs j WHERE j.id = $2), ''),
+    job_key = COALESCE((SELECT j.key FROM jobs j WHERE j.id = $2), ''),
     region_name = COALESCE((SELECT r.name_ar FROM regions r WHERE r.id = $3), ''),
     updated_at = NOW()
 WHERE users.id = $1;
@@ -177,7 +179,10 @@ JOIN user_interests ui ON ui.user_id = u.id
 WHERE ui.interest_id = @interest_id::int
   AND u.status = 'active'
   AND u.id != @exclude_user_id::int
-  AND (@filter_region_id::int = 0 OR u.region_id = @filter_region_id::int);
+  AND (@filter_region_id::int = 0 OR u.region_id = @filter_region_id::int)
+  -- Nobody should be told about a post their feed hides: retailers cannot fill a
+  -- buy request, and they only see sell posts from supply-side merchants.
+  AND (@exclude_retailers::bool = false OR u.job_key <> 'retailer');
 
 
 -- name: ListAllUsersAnyStatus :many

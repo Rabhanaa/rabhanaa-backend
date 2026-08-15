@@ -36,6 +36,7 @@ func (s *AuthService) GetCurrentUser(ctx context.Context, userID int32) (*model.
 		IsAdmin:          user.Role.Valid && user.Role.String == "admin",
 		RegionName:       user.RegionName,
 		JobName:          user.JobName,
+		JobKey:           user.JobKey,
 		Interests:        interestIDs,
 		SuppliesToRetail: user.SuppliesToRetail,
 	}

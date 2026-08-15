@@ -87,13 +87,16 @@ WHERE status = 'active' AND end_time > NOW()
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $3::int
   ))
   AND ($4::int = 0 OR region_id = $4::int)
+  AND ($5::text[] IS NULL OR cardinality($5::text[]) = 0 OR EXISTS (
+    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY($5::text[])))
 `
 
 type CountActiveSellAuctionsParams struct {
-	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
-	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
-	UserID                int32   `json:"user_id"`
-	FilterRegionID        int32   `json:"filter_region_id"`
+	ExcludeOwnerID        int32    `json:"exclude_owner_id"`
+	ExcludeBiddedAuctions []int32  `json:"exclude_bidded_auctions"`
+	UserID                int32    `json:"user_id"`
+	FilterRegionID        int32    `json:"filter_region_id"`
+	OwnerJobKeys          []string `json:"owner_job_keys"`
 }
 
 func (q *Queries) CountActiveSellAuctions(ctx context.Context, arg CountActiveSellAuctionsParams) (int64, error) {
@@ -102,6 +105,7 @@ func (q *Queries) CountActiveSellAuctions(ctx context.Context, arg CountActiveSe
 		arg.ExcludeBiddedAuctions,
 		arg.UserID,
 		arg.FilterRegionID,
+		arg.OwnerJobKeys,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -152,14 +156,17 @@ WHERE status = 'active' AND end_time > NOW()
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $4::int
   ))
   AND ($5::int = 0 OR region_id = $5::int)
+  AND ($6::text[] IS NULL OR cardinality($6::text[]) = 0 OR EXISTS (
+    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY($6::text[])))
 `
 
 type CountSearchSellAuctionsParams struct {
-	SearchTerm            string  `json:"search_term"`
-	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
-	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
-	UserID                int32   `json:"user_id"`
-	FilterRegionID        int32   `json:"filter_region_id"`
+	SearchTerm            string   `json:"search_term"`
+	ExcludeOwnerID        int32    `json:"exclude_owner_id"`
+	ExcludeBiddedAuctions []int32  `json:"exclude_bidded_auctions"`
+	UserID                int32    `json:"user_id"`
+	FilterRegionID        int32    `json:"filter_region_id"`
+	OwnerJobKeys          []string `json:"owner_job_keys"`
 }
 
 func (q *Queries) CountSearchSellAuctions(ctx context.Context, arg CountSearchSellAuctionsParams) (int64, error) {
@@ -169,6 +176,7 @@ func (q *Queries) CountSearchSellAuctions(ctx context.Context, arg CountSearchSe
 		arg.ExcludeBiddedAuctions,
 		arg.UserID,
 		arg.FilterRegionID,
+		arg.OwnerJobKeys,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -685,20 +693,23 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $5::int
   ))
   AND ($6::int = 0 OR sa.region_id = $6::int)
+  AND ($7::text[] IS NULL OR cardinality($7::text[]) = 0 OR EXISTS (
+    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY($7::text[])))
 ORDER BY
-  CASE WHEN sa.interest_id = ANY($7::integer[]) THEN 0 ELSE 1 END,
+  CASE WHEN sa.interest_id = ANY($8::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
 LIMIT $1 OFFSET $2
 `
 
 type ListActiveSellAuctionsParams struct {
-	Limit                 int32   `json:"limit"`
-	Offset                int32   `json:"offset"`
-	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
-	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
-	UserID                int32   `json:"user_id"`
-	FilterRegionID        int32   `json:"filter_region_id"`
-	UserInterestIds       []int32 `json:"user_interest_ids"`
+	Limit                 int32    `json:"limit"`
+	Offset                int32    `json:"offset"`
+	ExcludeOwnerID        int32    `json:"exclude_owner_id"`
+	ExcludeBiddedAuctions []int32  `json:"exclude_bidded_auctions"`
+	UserID                int32    `json:"user_id"`
+	FilterRegionID        int32    `json:"filter_region_id"`
+	OwnerJobKeys          []string `json:"owner_job_keys"`
+	UserInterestIds       []int32  `json:"user_interest_ids"`
 }
 
 func (q *Queries) ListActiveSellAuctions(ctx context.Context, arg ListActiveSellAuctionsParams) ([]SellAuction, error) {
@@ -709,6 +720,7 @@ func (q *Queries) ListActiveSellAuctions(ctx context.Context, arg ListActiveSell
 		arg.ExcludeBiddedAuctions,
 		arg.UserID,
 		arg.FilterRegionID,
+		arg.OwnerJobKeys,
 		arg.UserInterestIds,
 	)
 	if err != nil {
@@ -1046,21 +1058,24 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
     SELECT sb.auction_id FROM sell_bids sb WHERE sb.bidder_id = $6::int
   ))
   AND ($7::int = 0 OR sa.region_id = $7::int)
+  AND ($8::text[] IS NULL OR cardinality($8::text[]) = 0 OR EXISTS (
+    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY($8::text[])))
 ORDER BY
-  CASE WHEN sa.interest_id = ANY($8::integer[]) THEN 0 ELSE 1 END,
+  CASE WHEN sa.interest_id = ANY($9::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
 LIMIT $1 OFFSET $2
 `
 
 type SearchSellAuctionsParams struct {
-	Limit                 int32   `json:"limit"`
-	Offset                int32   `json:"offset"`
-	SearchTerm            string  `json:"search_term"`
-	ExcludeOwnerID        int32   `json:"exclude_owner_id"`
-	ExcludeBiddedAuctions []int32 `json:"exclude_bidded_auctions"`
-	UserID                int32   `json:"user_id"`
-	FilterRegionID        int32   `json:"filter_region_id"`
-	UserInterestIds       []int32 `json:"user_interest_ids"`
+	Limit                 int32    `json:"limit"`
+	Offset                int32    `json:"offset"`
+	SearchTerm            string   `json:"search_term"`
+	ExcludeOwnerID        int32    `json:"exclude_owner_id"`
+	ExcludeBiddedAuctions []int32  `json:"exclude_bidded_auctions"`
+	UserID                int32    `json:"user_id"`
+	FilterRegionID        int32    `json:"filter_region_id"`
+	OwnerJobKeys          []string `json:"owner_job_keys"`
+	UserInterestIds       []int32  `json:"user_interest_ids"`
 }
 
 func (q *Queries) SearchSellAuctions(ctx context.Context, arg SearchSellAuctionsParams) ([]SellAuction, error) {
@@ -1072,6 +1087,7 @@ func (q *Queries) SearchSellAuctions(ctx context.Context, arg SearchSellAuctions
 		arg.ExcludeBiddedAuctions,
 		arg.UserID,
 		arg.FilterRegionID,
+		arg.OwnerJobKeys,
 		arg.UserInterestIds,
 	)
 	if err != nil {

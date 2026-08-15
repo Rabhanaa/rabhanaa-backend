@@ -74,6 +74,7 @@ type UserResponse struct {
 	JobID            *int32  `json:"job_id,omitempty"`
 	RegionName       string  `json:"region_name,omitempty"`
 	JobName          string  `json:"job_name,omitempty"`
+	JobKey           string  `json:"job_key,omitempty"`
 	RejectionReason  *string `json:"rejection_reason,omitempty"`
 	Interests        []int32 `json:"interests,omitempty"`
 	SuppliesToRetail bool    `json:"supplies_to_retail"`

@@ -13,6 +13,7 @@ var (
 	ErrAccountNotActive         = errors.New("ACCOUNT_NOT_ACTIVE")
 	ErrPendingReview            = errors.New("PENDING_REVIEW")
 	ErrInvalidPostType          = errors.New("INVALID_POST_TYPE")
+	ErrRetailerCannotSell       = errors.New("RETAILER_CANNOT_SELL")
 	ErrInvalidResetCode         = errors.New("INVALID_RESET_CODE")
 	ErrResetCodeExpired         = errors.New("RESET_CODE_EXPIRED")
 	ErrInvalidPassword          = errors.New("INVALID_PASSWORD")
@@ -95,6 +96,7 @@ var ArabicMessages = map[string]string{
 	"INVALID_SIGNUP_SOURCE":       "مصدر التسجيل غير صحيح",
 	"AUCTION_NOT_FOUND":           "الصفقة غير موجودة",
 	"INVALID_POST_TYPE":           "نوع المنشور غير صحيح",
+	"RETAILER_CANNOT_SELL":        "حساب تاجر التجزئة مخصص للشراء — يمكنك إنشاء طلب شراء",
 	"INVALID_RESET_CODE":          "الرمز غير صحيح",
 	"RESET_CODE_EXPIRED":          "انتهت صلاحية الرمز — اطلب رمزاً جديداً",
 	"INVALID_PASSWORD":            "كلمة المرور يجب أن تكون 8-16 حرفاً وتحتوي على حرف كبير وصغير ورقم ورمز",

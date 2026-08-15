@@ -133,6 +133,13 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
+	// Retailers buy on this platform and sell to consumers off it, so a retail
+	// sell post has no audience here. This is a role check and is separate from
+	// the tier check above, which is about what a subscription allows.
+	if user.JobKey == RetailerRoleKey {
+		return nil, errs.ErrRetailerCannotSell
+	}
+
 	region, err := s.queries.GetRegionByID(ctx, regionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get region: %w", err)
@@ -170,12 +177,15 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 		return nil, fmt.Errorf("failed to create auction: %w", err)
 	}
 
-	go func(interestNameAr, auctionTitle, auctionPublicID string, interestID, auctionID, ownerID, postRegionID int32) {
+	go func(interestNameAr, auctionTitle, auctionPublicID string, interestID, auctionID, ownerID, postRegionID int32, ownerJobKey string) {
 		bgCtx := context.Background()
 		users, err := s.queries.GetActiveUsersByInterest(bgCtx, sqlc.GetActiveUsersByInterestParams{
 			InterestID:     interestID,
 			ExcludeUserID:  ownerID,
 			FilterRegionID: s.notifyRegion(postRegionID),
+			// A retailer's feed only shows supply-side sellers, so a post from
+			// anyone else must not notify them either.
+			ExcludeRetailers: !isSupplySideRole(ownerJobKey),
 		})
 		if err != nil {
 			slog.Error("broadcast sell auction: get interested users failed", "auction_id", auctionID, "error", err)
@@ -191,7 +201,7 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 		if err := s.queries.MarkSellAuctionNotified(bgCtx, auctionID); err != nil {
 			slog.Error("broadcast sell auction: mark notified failed", "auction_id", auctionID, "error", err)
 		}
-	}(interest.NameAr, auction.Title, auction.PublicID.String(), auction.InterestID, auction.ID, auction.OwnerID, auction.RegionID)
+	}(interest.NameAr, auction.Title, auction.PublicID.String(), auction.InterestID, auction.ID, auction.OwnerID, auction.RegionID, user.JobKey)
 
 	return s.toResponse(auction, userID), nil
 }
@@ -282,7 +292,7 @@ func (s *SellAuctionService) ListActiveAuctions(ctx context.Context, userID int3
 		pageSize = 20
 	}
 
-	filterRegion := s.viewerRegion(ctx, userID)
+	v := s.viewer(ctx, userID)
 	auctions, err := s.auctionRepo.ListActive(ctx, sqlc.ListActiveSellAuctionsParams{
 		Limit:                 pageSize,
 		Offset:                (page - 1) * pageSize,
@@ -290,13 +300,14 @@ func (s *SellAuctionService) ListActiveAuctions(ctx context.Context, userID int3
 		ExcludeBiddedAuctions: nil,
 		UserID:                userID,
 		UserInterestIds:       interestIDs,
-		FilterRegionID:        filterRegion,
+		FilterRegionID:        v.regionID,
+		OwnerJobKeys:          v.ownerJobKeys(),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list auctions: %w", err)
 	}
 
-	total, err := s.auctionRepo.CountActive(ctx, userID, filterRegion)
+	total, err := s.auctionRepo.CountActive(ctx, userID, v.regionID, v.ownerJobKeys())
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count auctions: %w", err)
 	}
@@ -317,20 +328,21 @@ func (s *SellAuctionService) SearchAuctions(ctx context.Context, userID int32, s
 		pageSize = 20
 	}
 
-	filterRegion := s.viewerRegion(ctx, userID)
+	v := s.viewer(ctx, userID)
 	auctions, err := s.auctionRepo.Search(ctx, sqlc.SearchSellAuctionsParams{
 		SearchTerm:      searchTerm,
 		Limit:           pageSize,
 		Offset:          (page - 1) * pageSize,
 		ExcludeOwnerID:  userID,
 		UserInterestIds: interestIDs,
-		FilterRegionID:  filterRegion,
+		FilterRegionID:  v.regionID,
+		OwnerJobKeys:    v.ownerJobKeys(),
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to search auctions: %w", err)
 	}
 
-	total, err := s.auctionRepo.CountSearch(ctx, searchTerm, userID, filterRegion)
+	total, err := s.auctionRepo.CountSearch(ctx, searchTerm, userID, v.regionID, v.ownerJobKeys())
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count search results: %w", err)
 	}
@@ -385,22 +397,20 @@ func (s *SellAuctionService) notifyRegion(postRegionID int32) int32 {
 	return 0
 }
 
-// viewerRegion returns the governorate a listing should be filtered to, or 0
-// for "no filter". The user lookup only happens while the feature is enabled,
-// so the default configuration costs nothing extra per request.
-func (s *SellAuctionService) viewerRegion(ctx context.Context, userID int32) int32 {
-	if !s.regionFilter {
-		return 0
-	}
+// viewer resolves the region and role filters for whoever is asking. The lookup
+// is skipped entirely when neither feature needs it.
+func (s *SellAuctionService) viewer(ctx context.Context, userID int32) viewerContext {
 	user, err := s.queries.GetUserByID(ctx, userID)
 	if err != nil {
-		slog.Error("region filter: failed to load viewer", "error", err, "user_id", userID)
-		return 0
+		slog.Error("failed to load viewer for listing filters", "error", err, "user_id", userID)
+		return viewerContext{}
 	}
-	if !user.RegionID.Valid {
-		return 0
+
+	v := viewerContext{isRetailer: user.JobKey == RetailerRoleKey}
+	if s.regionFilter && user.RegionID.Valid {
+		v.regionID = user.RegionID.Int32
 	}
-	return user.RegionID.Int32
+	return v
 }
 
 // initialStatus decides whether a new post goes live immediately or waits for an
@@ -411,4 +421,40 @@ func (s *SellAuctionService) initialStatus() string {
 		return "pending_approval"
 	}
 	return "active"
+}
+
+// SupplySideRoles are the merchant types a retailer is allowed to see sell posts
+// from. Kept in sync with SUPPLY_SIDE_ROLES in frontend RegisterPage.tsx, which
+// decides who is asked the supplies-to-retail question — if these two disagree,
+// a merchant can be offered that question yet stay invisible to retailers.
+var SupplySideRoles = []string{"importer", "wholesaler", "distributor", "processor", "supplier"}
+
+// RetailerRoleKey matches the jobs row added in migration 040.
+const RetailerRoleKey = "retailer"
+
+// viewerContext is what a listing request needs to know about whoever is asking:
+// which governorate to scope to (#11) and whether they are a retailer (#7). One
+// lookup serves both — the region filter already paid for this query.
+type viewerContext struct {
+	regionID   int32
+	isRetailer bool
+}
+
+// ownerJobKeys returns the roles a viewer may see sell posts from; empty means
+// no restriction.
+func (v viewerContext) ownerJobKeys() []string {
+	if v.isRetailer {
+		return SupplySideRoles
+	}
+	return nil
+}
+
+// isSupplySideRole reports whether posts from this role appear in retailer feeds.
+func isSupplySideRole(jobKey string) bool {
+	for _, r := range SupplySideRoles {
+		if r == jobKey {
+			return true
+		}
+	}
+	return false
 }

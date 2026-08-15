@@ -125,6 +125,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 			JobID:            &user.JobID.Int32,
 			RegionName:       region.NameAr,
 			JobName:          job.NameAr,
+			JobKey:           job.Key,
 			SuppliesToRetail: user.SuppliesToRetail,
 		},
 	}, nil

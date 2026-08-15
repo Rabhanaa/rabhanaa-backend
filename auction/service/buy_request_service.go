@@ -164,6 +164,8 @@ func (s *BuyRequestService) CreateBuyRequest(ctx context.Context, userID int32, 
 			InterestID:     interestID,
 			ExcludeUserID:  ownerID,
 			FilterRegionID: s.notifyRegion(postRegionID),
+			// Retailers cannot supply a buy request.
+			ExcludeRetailers: true,
 		})
 		if err != nil {
 			slog.Error("broadcast buy request: get interested users failed", "request_id", requestID, "error", err)
@@ -269,7 +271,13 @@ func (s *BuyRequestService) ListActiveBuyRequests(ctx context.Context, userID in
 		pageSize = 20
 	}
 
-	filterRegion := s.viewerRegion(ctx, userID)
+	v := s.viewer(ctx, userID)
+	// A retailer buys from wholesalers; they cannot fulfil someone else's buy
+	// request, so the whole tab is empty for them. Enforced here rather than only
+	// hiding the tab, so calling the endpoint directly gives the same answer.
+	if v.isRetailer {
+		return nil, 0, nil
+	}
 	requests, err := s.requestRepo.ListActive(ctx, sqlc.ListActiveBuyRequestsParams{
 		Limit:                  pageSize,
 		Offset:                 (page - 1) * pageSize,
@@ -277,13 +285,13 @@ func (s *BuyRequestService) ListActiveBuyRequests(ctx context.Context, userID in
 		ExcludeOfferedRequests: nil,
 		UserID:                 userID,
 		UserInterestIds:        interestIDs,
-		FilterRegionID:         filterRegion,
+		FilterRegionID:         v.regionID,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list requests: %w", err)
 	}
 
-	total, err := s.requestRepo.CountActive(ctx, userID, filterRegion)
+	total, err := s.requestRepo.CountActive(ctx, userID, v.regionID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count requests: %w", err)
 	}
@@ -304,20 +312,26 @@ func (s *BuyRequestService) SearchBuyRequests(ctx context.Context, userID int32,
 		pageSize = 20
 	}
 
-	filterRegion := s.viewerRegion(ctx, userID)
+	v := s.viewer(ctx, userID)
+	// A retailer buys from wholesalers; they cannot fulfil someone else's buy
+	// request, so the whole tab is empty for them. Enforced here rather than only
+	// hiding the tab, so calling the endpoint directly gives the same answer.
+	if v.isRetailer {
+		return nil, 0, nil
+	}
 	requests, err := s.requestRepo.Search(ctx, sqlc.SearchBuyRequestsParams{
 		SearchTerm:      searchTerm,
 		Limit:           pageSize,
 		Offset:          (page - 1) * pageSize,
 		ExcludeOwnerID:  userID,
 		UserInterestIds: interestIDs,
-		FilterRegionID:  filterRegion,
+		FilterRegionID:  v.regionID,
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to search requests: %w", err)
 	}
 
-	total, err := s.requestRepo.CountSearch(ctx, searchTerm, userID, filterRegion)
+	total, err := s.requestRepo.CountSearch(ctx, searchTerm, userID, v.regionID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to count search results: %w", err)
 	}
@@ -371,22 +385,20 @@ func (s *BuyRequestService) notifyRegion(postRegionID int32) int32 {
 	return 0
 }
 
-// viewerRegion returns the governorate a listing should be filtered to, or 0
-// for "no filter". The user lookup only happens while the feature is enabled,
-// so the default configuration costs nothing extra per request.
-func (s *BuyRequestService) viewerRegion(ctx context.Context, userID int32) int32 {
-	if !s.regionFilter {
-		return 0
-	}
+// viewer resolves the listing filters for whoever is asking. See
+// SellAuctionService.viewer.
+func (s *BuyRequestService) viewer(ctx context.Context, userID int32) viewerContext {
 	user, err := s.queries.GetUserByID(ctx, userID)
 	if err != nil {
-		slog.Error("region filter: failed to load viewer", "error", err, "user_id", userID)
-		return 0
+		slog.Error("failed to load viewer for listing filters", "error", err, "user_id", userID)
+		return viewerContext{}
 	}
-	if !user.RegionID.Valid {
-		return 0
+
+	v := viewerContext{isRetailer: user.JobKey == RetailerRoleKey}
+	if s.regionFilter && user.RegionID.Valid {
+		v.regionID = user.RegionID.Int32
 	}
-	return user.RegionID.Int32
+	return v
 }
 
 // initialStatus decides whether a new post goes live immediately or waits for an
