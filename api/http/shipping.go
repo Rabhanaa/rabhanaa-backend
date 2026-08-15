@@ -1,14 +1,17 @@
 package http
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
 	"rabhana/db/sqlc"
+	"rabhana/pkg/errs"
 )
 
 // ShippingHandler serves the carrier directory. Merchants get a read-only view
@@ -136,6 +139,11 @@ func (h *ShippingHandler) AdminUpdate(c *gin.Context) {
 		IsActive: isActive,
 	})
 	if err != nil {
+		// Otherwise the driver's "no rows in result set" reaches the client.
+		if errors.Is(err, pgx.ErrNoRows) {
+			handleError(c, errs.ErrShippingCompanyNotFound)
+			return
+		}
 		handleError(c, err)
 		return
 	}
