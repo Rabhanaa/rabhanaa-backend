@@ -14,10 +14,15 @@ import (
 // Deliberately in-process: a shared limiter needs Redis, and the cron already
 // assumes a single API instance. It resets on deploy and would not coordinate
 // across replicas — enough to stop a careless scraper, not a distributed one.
+//
+// The limit is deliberately generous. Egyptian mobile carriers put large
+// numbers of subscribers behind one CGNAT address, so an IP is a poor proxy for
+// a person: blocking real customers costs far more than a scraper collecting
+// data the client has decided to publish anyway.
 const (
-	publicRateBurst  = 60          // requests a caller may spend at once
-	publicRateWindow = time.Minute // and how long a full refill takes
-	bucketIdleTTL    = 10 * time.Minute
+	defaultPublicRatePerMinute = 300
+	publicRateWindow           = time.Minute
+	bucketIdleTTL              = 10 * time.Minute
 )
 
 type bucket struct {
@@ -38,22 +43,22 @@ func newIPLimiter() *ipLimiter {
 
 // allow spends one token, refilling continuously rather than on a fixed window
 // boundary so a caller cannot burst twice by straddling one.
-func (l *ipLimiter) allow(ip string) bool {
+func (l *ipLimiter) allow(ip string, burst float64) bool {
 	now := time.Now()
-	refillPerSecond := float64(publicRateBurst) / publicRateWindow.Seconds()
+	refillPerSecond := burst / publicRateWindow.Seconds()
 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
 	b, ok := l.buckets[ip]
 	if !ok {
-		l.buckets[ip] = &bucket{tokens: publicRateBurst - 1, lastSeen: now}
+		l.buckets[ip] = &bucket{tokens: burst - 1, lastSeen: now}
 		return true
 	}
 
 	b.tokens += now.Sub(b.lastSeen).Seconds() * refillPerSecond
-	if b.tokens > publicRateBurst {
-		b.tokens = publicRateBurst
+	if b.tokens > burst {
+		b.tokens = burst
 	}
 	b.lastSeen = now
 
@@ -78,15 +83,28 @@ func (l *ipLimiter) reapIdle() {
 	}
 }
 
-// PublicRateLimit throttles unauthenticated reads per client IP.
-func PublicRateLimit() gin.HandlerFunc {
+// PublicRateLimit throttles anonymous reads per client IP.
+//
+// Must be registered AFTER OptionalAuth: a signed-in caller is identified by
+// their token, so throttling them by address is the wrong axis and would punish
+// every member sharing a carrier NAT for one noisy neighbour.
+func PublicRateLimit(perMinute int) gin.HandlerFunc {
 	limiter := newIPLimiter()
+	if perMinute <= 0 {
+		perMinute = defaultPublicRatePerMinute
+	}
+	burst := float64(perMinute)
 
 	return func(c *gin.Context) {
+		if c.GetInt("userID") != 0 {
+			c.Next()
+			return
+		}
+
 		// ClientIP honours the proxy headers Gin is configured to trust, which
 		// matters behind coolify-proxy — otherwise every request would share the
 		// proxy's own address and one visitor could throttle everyone.
-		if !limiter.allow(c.ClientIP()) {
+		if !limiter.allow(c.ClientIP(), burst) {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error":   "RATE_LIMITED",
 				"message": "عدد كبير من الطلبات — حاول بعد قليل",

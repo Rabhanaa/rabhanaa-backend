@@ -259,6 +259,7 @@ type AppConfig struct {
 	ResendAPIKey             string
 	EmailFrom                string
 	EmailFromName            string
+	PublicRateLimitPerMinute int
 	FirebaseCredentialsPath  string
 	FirebaseCredentialsJSON  string
 	AppBaseURL               string
@@ -295,6 +296,7 @@ func LoadAppConfig() *AppConfig {
 		ResendAPIKey:             getEnv("RESEND_API_KEY", ""),
 		EmailFrom:                getEnv("EMAIL_FROM", "no-reply@rabhanaa.com"),
 		EmailFromName:            getEnv("EMAIL_FROM_NAME", "ربحانة"),
+		PublicRateLimitPerMinute: getEnvAsInt("PUBLIC_RATE_LIMIT_PER_MINUTE", 300),
 		FirebaseCredentialsPath:  getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseCredentialsJSON:  getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 		AppBaseURL:               getEnv("APP_BASE_URL", "http://localhost:8080"),

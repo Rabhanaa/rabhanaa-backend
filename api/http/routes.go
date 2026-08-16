@@ -51,8 +51,10 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// filter, own-post exclusion and is_owner flag. Rate limited because these
 	// are the only unauthenticated endpoints that touch business data.
 	publicRead := apiV1.Group("")
-	publicRead.Use(middleware.PublicRateLimit())
+	// Order matters: OptionalAuth first so the limiter can tell a member from a
+	// visitor and only throttle the latter.
 	publicRead.Use(middleware.OptionalAuth(ctx.AuthService))
+	publicRead.Use(middleware.PublicRateLimit(ctx.Config.PublicRateLimitPerMinute))
 
 	// Protected routes (require auth + account status check with subscription)
 	protected := apiV1.Group("")
