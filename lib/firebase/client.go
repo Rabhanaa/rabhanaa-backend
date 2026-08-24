@@ -67,6 +67,14 @@ func (c *Client) buildLink(data map[string]string) string {
 		if id := data["request_id"]; id != "" {
 			return c.baseURL + "/auctions/buy/" + id
 		}
+	// Moderation verdicts (#18) — either kind of post, so try both ids.
+	case "post_approved", "post_rejected", "post_suspended":
+		if id := data["auction_id"]; id != "" {
+			return c.baseURL + "/auctions/sell/" + id
+		}
+		if id := data["request_id"]; id != "" {
+			return c.baseURL + "/auctions/buy/" + id
+		}
 	case "new_order", "order_confirmed":
 		if id := data["order_id"]; id != "" {
 			return c.baseURL + "/orders/" + id

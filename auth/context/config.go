@@ -23,7 +23,7 @@ func LoadAuthConfig() *AuthConfig {
 		OTPLength:            6,
 		PasswordMinLength:    8,
 		PasswordMaxLength:    16,
-		MinInterests:         1,
+		MinInterests:         config.GetEnvAsInt("MIN_INTERESTS_AT_REGISTRATION", 1),
 		PhoneRegex:           `^01[0125]\d{8}$`,
 		// Off by default: document verification gates nothing functionally —
 		// the manual subscription grant is the real checkpoint.

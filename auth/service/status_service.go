@@ -23,7 +23,7 @@ func (s *AuthService) GetUserStatus(ctx context.Context, userID int32) (*UserSta
 
 	accountStatus := model.UserStatus(data.Status)
 	requireDocuments := s.config.RequireDocuments
-	onboardingStatus := determineOnboardingStatus(data, accountStatus, requireDocuments)
+	onboardingStatus := determineOnboardingStatus(data, accountStatus, requireDocuments, s.config.MinInterests)
 
 	// Lazy migration: with documents switched off, a user who finished the rest
 	// of onboarding is effectively active, but their row still says
@@ -66,7 +66,7 @@ func (s *AuthService) GetUserStatus(ctx context.Context, userID int32) (*UserSta
 	}, nil
 }
 
-func determineOnboardingStatus(data sqlc.GetUserStatusDataRow, accountStatus model.UserStatus, requireDocuments bool) model.OnboardingStatus {
+func determineOnboardingStatus(data sqlc.GetUserStatusDataRow, accountStatus model.UserStatus, requireDocuments bool, minInterests int) model.OnboardingStatus {
 	switch accountStatus {
 	case model.StatusSuspended:
 		return model.OnboardingSuspended
@@ -77,12 +77,14 @@ func determineOnboardingStatus(data sqlc.GetUserStatusDataRow, accountStatus mod
 	case model.StatusActive:
 		return model.OnboardingActive
 	case model.StatusPendingDocuments:
-		if data.InterestsCount < 5 {
+		// Must match what registration actually accepts — a hardcoded 5 here
+		// while MIN_INTERESTS_AT_REGISTRATION is 1 left everyone who picked
+		// fewer than five permanently short of active.
+		if int(data.InterestsCount) < minInterests {
 			return model.OnboardingPickInterests
 		}
-		if !data.Latitude.Valid || !data.Longitude.Valid {
-			return model.OnboardingSetLocation
-		}
+		// Location is not a gate: #9 gives the user a skip button, so requiring
+		// coordinates here would strand everyone who used it.
 		if !requireDocuments {
 			return model.OnboardingActive
 		}

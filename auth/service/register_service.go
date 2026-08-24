@@ -52,6 +52,14 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	// With document upload switched off (#12) there is nothing for the account to
+	// wait for, so parking it in pending_documents only mislabels it in the
+	// profile and drops it into the admin verification queue forever.
+	initialStatus := string(model.StatusActive)
+	if s.config.RequireDocuments {
+		initialStatus = string(model.StatusPendingDocuments)
+	}
+
 	user, err := s.repo.CreateUser(ctx, sqlc.CreateUserParams{
 		Email:            req.Email,
 		Phone:            pgtype.Text{String: req.Phone, Valid: true},
@@ -59,7 +67,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 		Name:             req.Name,
 		RegionID:         pgtype.Int4{Int32: req.RegionID, Valid: true},
 		JobID:            pgtype.Int4{Int32: req.JobID, Valid: true},
-		Status:           "pending_documents",
+		Status:           initialStatus,
 		SignupSource:     signupSource,
 		SuppliesToRetail: req.SuppliesToRetail,
 	})
@@ -73,9 +81,6 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 		ID_3: req.RegionID,
 	}); err != nil {
 		return nil, fmt.Errorf("failed to update cached names: %w", err)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
 	// Create free tier subscription for new user

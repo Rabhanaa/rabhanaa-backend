@@ -175,7 +175,12 @@ func (s *ModerationService) Reject(ctx context.Context, adminID int32, postType 
 		if err != nil {
 			return wrapModerationErr(err, "reject sell auction")
 		}
-		s.notify(ctx, a.OwnerID, notifModel.EventPostRejected, reason, map[string]string{"type": "post_rejected"})
+		// Carry the post id: the owner taps the notification to go and fix the
+		// post, and without an id there is nowhere for it to lead. Their own
+		// non-active posts are visible to them on the detail page.
+		s.notify(ctx, a.OwnerID, notifModel.EventPostRejected, reason, map[string]string{
+			"type": "post_rejected", "auction_id": a.PublicID.String(),
+		})
 		return nil
 	}
 
@@ -183,7 +188,9 @@ func (s *ModerationService) Reject(ctx context.Context, adminID int32, postType 
 	if err != nil {
 		return wrapModerationErr(err, "reject buy request")
 	}
-	s.notify(ctx, r.OwnerID, notifModel.EventPostRejected, reason, map[string]string{"type": "post_rejected"})
+	s.notify(ctx, r.OwnerID, notifModel.EventPostRejected, reason, map[string]string{
+		"type": "post_rejected", "request_id": r.PublicID.String(),
+	})
 	return nil
 }
 
@@ -200,7 +207,9 @@ func (s *ModerationService) Suspend(ctx context.Context, adminID int32, postType
 		if err != nil {
 			return wrapModerationErr(err, "suspend sell auction")
 		}
-		s.notify(ctx, a.OwnerID, notifModel.EventPostSuspended, reason, map[string]string{"type": "post_suspended"})
+		s.notify(ctx, a.OwnerID, notifModel.EventPostSuspended, reason, map[string]string{
+			"type": "post_suspended", "auction_id": a.PublicID.String(),
+		})
 		return nil
 	}
 
@@ -208,7 +217,9 @@ func (s *ModerationService) Suspend(ctx context.Context, adminID int32, postType
 	if err != nil {
 		return wrapModerationErr(err, "suspend buy request")
 	}
-	s.notify(ctx, r.OwnerID, notifModel.EventPostSuspended, reason, map[string]string{"type": "post_suspended"})
+	s.notify(ctx, r.OwnerID, notifModel.EventPostSuspended, reason, map[string]string{
+		"type": "post_suspended", "request_id": r.PublicID.String(),
+	})
 	return nil
 }
 
