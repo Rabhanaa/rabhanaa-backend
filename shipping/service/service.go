@@ -376,6 +376,34 @@ func (s *Service) UpdateProfile(ctx context.Context, carrierID int32, req model.
 	return nil
 }
 
+// CarryQuoteToOrder moves a carrier chosen at post stage onto the order the deal
+// became. Without it, a merchant who picked a carrier while the post was live
+// would find the order showing no carrier at all, and the carrier feed would
+// offer the same job again.
+//
+// Deliberately quiet: an order with no accepted post-stage quote is the normal
+// case, and a failure here must never fail the selection that created the order.
+func (s *Service) CarryQuoteToOrder(ctx context.Context, orderID int32, sellAuctionID, buyRequestID int32) {
+	quote, err := s.queries.GetAcceptedQuoteForPost(ctx, sqlc.GetAcceptedQuoteForPostParams{
+		SellAuctionID: sellAuctionID,
+		BuyRequestID:  buyRequestID,
+	})
+	if err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			slog.Error("failed to look up accepted shipping quote for post", "error", err, "order_id", orderID)
+		}
+		return
+	}
+
+	if _, err := s.queries.AttachCarrierToOrder(ctx, sqlc.AttachCarrierToOrderParams{
+		ID:            orderID,
+		CarrierID:     pgtype.Int4{Int32: quote.CarrierID, Valid: true},
+		ShippingPrice: quote.Price,
+	}); err != nil {
+		slog.Error("failed to carry carrier onto order", "error", err, "order_id", orderID)
+	}
+}
+
 // --------------------------------------------------------------- merchant side
 
 // ListQuotesForJob returns the quotes on a job to the merchant who owns it.

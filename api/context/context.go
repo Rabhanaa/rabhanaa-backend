@@ -179,6 +179,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		*authRepository,
 		notificationService,
 		cfg.SelectionWindowHours,
+		shippingService,
 	)
 
 	buySelectionService := auctionSvcPkg.NewBuySelectionService(
@@ -188,6 +189,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		*authRepository,
 		notificationService,
 		cfg.SelectionWindowHours,
+		shippingService,
 	)
 
 	orderService := orderSvcPkg.NewOrderService(

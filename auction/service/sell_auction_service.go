@@ -39,6 +39,13 @@ type UploadService interface {
 	UploadFile(ctx context.Context, file []byte, filename string) (string, error)
 }
 
+// CarrierAttacher moves a carrier chosen while a post was live onto the order
+// that post became (#14). Declared as an interface for the same reason
+// NotificationSender is: this package should not depend on shipping/service.
+type CarrierAttacher interface {
+	CarryQuoteToOrder(ctx context.Context, orderID int32, sellAuctionID, buyRequestID int32)
+}
+
 func NewSellAuctionService(
 	auctionRepo repository.SellAuctionRepository,
 	queries *sqlc.Queries,

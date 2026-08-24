@@ -93,6 +93,8 @@ type Querier interface {
 	CreateLoginHistory(ctx context.Context, arg CreateLoginHistoryParams) error
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
 	CreateOrderFromBuyRequest(ctx context.Context, arg CreateOrderFromBuyRequestParams) (Order, error)
+	// The region ids alongside the names: carrier job feeds (#14) scope by
+	// governorate id, and this table only ever denormalized the display names.
 	CreateOrderFromSellAuction(ctx context.Context, arg CreateOrderFromSellAuctionParams) (Order, error)
 	CreatePasswordResetCode(ctx context.Context, arg CreatePasswordResetCodeParams) (PasswordResetCode, error)
 	CreateReferralCode(ctx context.Context, arg CreateReferralCodeParams) (ReferralCode, error)
@@ -113,6 +115,10 @@ type Querier interface {
 	DeleteUserInterests(ctx context.Context, userID int32) error
 	EnsureSeedUser(ctx context.Context, arg EnsureSeedUserParams) (User, error)
 	GetAcceptedQuoteForOrder(ctx context.Context, orderID pgtype.Int4) (GetAcceptedQuoteForOrderRow, error)
+	// Post-stage acceptance happens before an order exists, so when the deal closes
+	// the winning carrier has to be carried onto it — otherwise the order looks
+	// unshipped and the carrier feed would offer it again.
+	GetAcceptedQuoteForPost(ctx context.Context, arg GetAcceptedQuoteForPostParams) (ShippingQuote, error)
 	GetActiveDeviceTokensByUser(ctx context.Context, userID int32) ([]DeviceToken, error)
 	GetActiveUsersByInterest(ctx context.Context, arg GetActiveUsersByInterestParams) ([]int32, error)
 	// Admin: lists ALL subscriptions for a user, active or not.

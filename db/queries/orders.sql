@@ -1,14 +1,18 @@
 -- name: CreateOrderFromSellAuction :one
+-- The region ids alongside the names: carrier job feeds (#14) scope by
+-- governorate id, and this table only ever denormalized the display names.
 INSERT INTO orders (
     sell_auction_id, seller_id, buyer_id, final_price, quantity, unit,
     seller_name, seller_phone, seller_region,
     buyer_name, buyer_phone, buyer_region,
+    seller_region_id, buyer_region_id,
     source_public_id, status, seller_confirmed_at, confirmation_deadline
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9,
     $10, $11, $12,
-    $13, 'seller_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
+    $13, $14,
+    $15, 'seller_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
 ) RETURNING *;
 
 -- name: CreateOrderFromBuyRequest :one
@@ -16,12 +20,14 @@ INSERT INTO orders (
     buy_request_id, seller_id, buyer_id, final_price, quantity, unit,
     seller_name, seller_phone, seller_region,
     buyer_name, buyer_phone, buyer_region,
+    seller_region_id, buyer_region_id,
     source_public_id, status, buyer_confirmed_at, confirmation_deadline
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9,
     $10, $11, $12,
-    $13, 'buyer_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
+    $13, $14,
+    $15, 'buyer_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
 ) RETURNING *;
 
 -- name: GetOrderByID :one

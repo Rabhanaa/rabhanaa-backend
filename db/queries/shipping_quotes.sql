@@ -185,3 +185,13 @@ SELECT q.*, u.name AS carrier_name, u.phone AS carrier_phone
 FROM shipping_quotes q
 JOIN users u ON u.id = q.carrier_id
 WHERE q.order_id = $1 AND q.status = 'accepted';
+
+-- name: GetAcceptedQuoteForPost :one
+-- Post-stage acceptance happens before an order exists, so when the deal closes
+-- the winning carrier has to be carried onto it — otherwise the order looks
+-- unshipped and the carrier feed would offer it again.
+SELECT * FROM shipping_quotes
+WHERE status = 'accepted'
+  AND ((@sell_auction_id::int > 0 AND sell_auction_id = @sell_auction_id::int)
+    OR (@buy_request_id::int > 0 AND buy_request_id = @buy_request_id::int))
+LIMIT 1;

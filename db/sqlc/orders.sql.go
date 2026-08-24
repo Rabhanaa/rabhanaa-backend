@@ -96,12 +96,14 @@ INSERT INTO orders (
     buy_request_id, seller_id, buyer_id, final_price, quantity, unit,
     seller_name, seller_phone, seller_region,
     buyer_name, buyer_phone, buyer_region,
+    seller_region_id, buyer_region_id,
     source_public_id, status, buyer_confirmed_at, confirmation_deadline
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9,
     $10, $11, $12,
-    $13, 'buyer_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
+    $13, $14,
+    $15, 'buyer_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
 ) RETURNING id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id
 `
 
@@ -118,6 +120,8 @@ type CreateOrderFromBuyRequestParams struct {
 	BuyerName      string         `json:"buyer_name"`
 	BuyerPhone     string         `json:"buyer_phone"`
 	BuyerRegion    string         `json:"buyer_region"`
+	SellerRegionID pgtype.Int4    `json:"seller_region_id"`
+	BuyerRegionID  pgtype.Int4    `json:"buyer_region_id"`
 	SourcePublicID pgtype.UUID    `json:"source_public_id"`
 }
 
@@ -135,6 +139,8 @@ func (q *Queries) CreateOrderFromBuyRequest(ctx context.Context, arg CreateOrder
 		arg.BuyerName,
 		arg.BuyerPhone,
 		arg.BuyerRegion,
+		arg.SellerRegionID,
+		arg.BuyerRegionID,
 		arg.SourcePublicID,
 	)
 	var i Order
@@ -176,12 +182,14 @@ INSERT INTO orders (
     sell_auction_id, seller_id, buyer_id, final_price, quantity, unit,
     seller_name, seller_phone, seller_region,
     buyer_name, buyer_phone, buyer_region,
+    seller_region_id, buyer_region_id,
     source_public_id, status, seller_confirmed_at, confirmation_deadline
 ) VALUES (
     $1, $2, $3, $4, $5, $6,
     $7, $8, $9,
     $10, $11, $12,
-    $13, 'seller_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
+    $13, $14,
+    $15, 'seller_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
 ) RETURNING id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id
 `
 
@@ -198,9 +206,13 @@ type CreateOrderFromSellAuctionParams struct {
 	BuyerName      string         `json:"buyer_name"`
 	BuyerPhone     string         `json:"buyer_phone"`
 	BuyerRegion    string         `json:"buyer_region"`
+	SellerRegionID pgtype.Int4    `json:"seller_region_id"`
+	BuyerRegionID  pgtype.Int4    `json:"buyer_region_id"`
 	SourcePublicID pgtype.UUID    `json:"source_public_id"`
 }
 
+// The region ids alongside the names: carrier job feeds (#14) scope by
+// governorate id, and this table only ever denormalized the display names.
 func (q *Queries) CreateOrderFromSellAuction(ctx context.Context, arg CreateOrderFromSellAuctionParams) (Order, error) {
 	row := q.db.QueryRow(ctx, createOrderFromSellAuction,
 		arg.SellAuctionID,
@@ -215,6 +227,8 @@ func (q *Queries) CreateOrderFromSellAuction(ctx context.Context, arg CreateOrde
 		arg.BuyerName,
 		arg.BuyerPhone,
 		arg.BuyerRegion,
+		arg.SellerRegionID,
+		arg.BuyerRegionID,
 		arg.SourcePublicID,
 	)
 	var i Order

@@ -34,6 +34,7 @@ type SellSelectionService struct {
 	userRepo             authRepo.Repository
 	notificationSender   NotificationSender
 	selectionWindowHours int
+	carrierAttacher      CarrierAttacher
 }
 
 func NewSellSelectionService(
@@ -43,6 +44,7 @@ func NewSellSelectionService(
 	userRepo authRepo.Repository,
 	notificationSender NotificationSender,
 	selectionWindowHours int,
+	carrierAttacher CarrierAttacher,
 ) *SellSelectionService {
 	return &SellSelectionService{
 		auctionRepo:          auctionRepo,
@@ -51,6 +53,7 @@ func NewSellSelectionService(
 		userRepo:             userRepo,
 		notificationSender:   notificationSender,
 		selectionWindowHours: selectionWindowHours,
+		carrierAttacher:      carrierAttacher,
 	}
 }
 
@@ -125,10 +128,18 @@ func (s *SellSelectionService) SelectWinner(ctx context.Context, ownerID int32, 
 		BuyerName:      buyer.Name,
 		BuyerPhone:     getPgTextValue(buyer.Phone),
 		BuyerRegion:    buyer.RegionName,
+		SellerRegionID: seller.RegionID,
+		BuyerRegionID:  buyer.RegionID,
 		SourcePublicID: auction.PublicID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create order: %w", err)
+	}
+
+	// A carrier picked while this post was live belongs on the order now (#14).
+	// No-op in the usual case, and never fatal — the deal is already done.
+	if s.carrierAttacher != nil {
+		s.carrierAttacher.CarryQuoteToOrder(ctx, order.ID, auction.ID, 0)
 	}
 
 	s.notificationSender.Send(ctx, bid.BidderID, notifModel.EventWinnerSelected, map[string]string{

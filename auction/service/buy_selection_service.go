@@ -27,6 +27,7 @@ type BuySelectionService struct {
 	userRepo             authRepo.Repository
 	notificationSender   NotificationSender
 	selectionWindowHours int
+	carrierAttacher      CarrierAttacher
 }
 
 func NewBuySelectionService(
@@ -36,6 +37,7 @@ func NewBuySelectionService(
 	userRepo authRepo.Repository,
 	notificationSender NotificationSender,
 	selectionWindowHours int,
+	carrierAttacher CarrierAttacher,
 ) *BuySelectionService {
 	return &BuySelectionService{
 		requestRepo:          requestRepo,
@@ -44,6 +46,7 @@ func NewBuySelectionService(
 		userRepo:             userRepo,
 		notificationSender:   notificationSender,
 		selectionWindowHours: selectionWindowHours,
+		carrierAttacher:      carrierAttacher,
 	}
 }
 
@@ -163,10 +166,17 @@ func (s *BuySelectionService) AcceptOffer(ctx context.Context, ownerID int32, re
 		BuyerName:      buyer.Name,
 		BuyerPhone:     getPgTextValue(buyer.Phone),
 		BuyerRegion:    buyer.RegionName,
+		SellerRegionID: seller.RegionID,
+		BuyerRegionID:  buyer.RegionID,
 		SourcePublicID: request.PublicID,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create order: %w", err)
+	}
+
+	// A carrier picked while this request was live belongs on the order now (#14).
+	if s.carrierAttacher != nil {
+		s.carrierAttacher.CarryQuoteToOrder(ctx, order.ID, 0, request.ID)
 	}
 
 	s.notificationSender.Send(ctx, offer.SupplierID, notifModel.EventOfferAccepted, map[string]string{

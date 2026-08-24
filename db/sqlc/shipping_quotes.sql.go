@@ -227,6 +227,42 @@ func (q *Queries) GetAcceptedQuoteForOrder(ctx context.Context, orderID pgtype.I
 	return i, err
 }
 
+const getAcceptedQuoteForPost = `-- name: GetAcceptedQuoteForPost :one
+SELECT id, public_id, carrier_id, sell_auction_id, buy_request_id, order_id, price, notes, status, accepted_at, created_at, updated_at FROM shipping_quotes
+WHERE status = 'accepted'
+  AND (($1::int > 0 AND sell_auction_id = $1::int)
+    OR ($2::int > 0 AND buy_request_id = $2::int))
+LIMIT 1
+`
+
+type GetAcceptedQuoteForPostParams struct {
+	SellAuctionID int32 `json:"sell_auction_id"`
+	BuyRequestID  int32 `json:"buy_request_id"`
+}
+
+// Post-stage acceptance happens before an order exists, so when the deal closes
+// the winning carrier has to be carried onto it — otherwise the order looks
+// unshipped and the carrier feed would offer it again.
+func (q *Queries) GetAcceptedQuoteForPost(ctx context.Context, arg GetAcceptedQuoteForPostParams) (ShippingQuote, error) {
+	row := q.db.QueryRow(ctx, getAcceptedQuoteForPost, arg.SellAuctionID, arg.BuyRequestID)
+	var i ShippingQuote
+	err := row.Scan(
+		&i.ID,
+		&i.PublicID,
+		&i.CarrierID,
+		&i.SellAuctionID,
+		&i.BuyRequestID,
+		&i.OrderID,
+		&i.Price,
+		&i.Notes,
+		&i.Status,
+		&i.AcceptedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getShippingQuoteByPublicID = `-- name: GetShippingQuoteByPublicID :one
 SELECT id, public_id, carrier_id, sell_auction_id, buy_request_id, order_id, price, notes, status, accepted_at, created_at, updated_at FROM shipping_quotes WHERE public_id = $1
 `
