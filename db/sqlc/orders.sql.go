@@ -102,7 +102,7 @@ INSERT INTO orders (
     $7, $8, $9,
     $10, $11, $12,
     $13, 'buyer_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
-) RETURNING id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at
+) RETURNING id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id
 `
 
 type CreateOrderFromBuyRequestParams struct {
@@ -163,6 +163,10 @@ func (q *Queries) CreateOrderFromBuyRequest(ctx context.Context, arg CreateOrder
 		&i.SourcePublicID,
 		&i.ConfirmationDeadline,
 		&i.CancelledAt,
+		&i.CarrierID,
+		&i.ShippingPrice,
+		&i.SellerRegionID,
+		&i.BuyerRegionID,
 	)
 	return i, err
 }
@@ -178,7 +182,7 @@ INSERT INTO orders (
     $7, $8, $9,
     $10, $11, $12,
     $13, 'seller_confirmed', NOW(), NOW() + INTERVAL '30 minutes'
-) RETURNING id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at
+) RETURNING id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id
 `
 
 type CreateOrderFromSellAuctionParams struct {
@@ -239,12 +243,16 @@ func (q *Queries) CreateOrderFromSellAuction(ctx context.Context, arg CreateOrde
 		&i.SourcePublicID,
 		&i.ConfirmationDeadline,
 		&i.CancelledAt,
+		&i.CarrierID,
+		&i.ShippingPrice,
+		&i.SellerRegionID,
+		&i.BuyerRegionID,
 	)
 	return i, err
 }
 
 const getOrderByID = `-- name: GetOrderByID :one
-SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at FROM orders WHERE id = $1
+SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id FROM orders WHERE id = $1
 `
 
 func (q *Queries) GetOrderByID(ctx context.Context, id int32) (Order, error) {
@@ -275,12 +283,16 @@ func (q *Queries) GetOrderByID(ctx context.Context, id int32) (Order, error) {
 		&i.SourcePublicID,
 		&i.ConfirmationDeadline,
 		&i.CancelledAt,
+		&i.CarrierID,
+		&i.ShippingPrice,
+		&i.SellerRegionID,
+		&i.BuyerRegionID,
 	)
 	return i, err
 }
 
 const getOrderByPublicID = `-- name: GetOrderByPublicID :one
-SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at FROM orders WHERE public_id = $1
+SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id FROM orders WHERE public_id = $1
 `
 
 func (q *Queries) GetOrderByPublicID(ctx context.Context, publicID pgtype.UUID) (Order, error) {
@@ -311,12 +323,16 @@ func (q *Queries) GetOrderByPublicID(ctx context.Context, publicID pgtype.UUID) 
 		&i.SourcePublicID,
 		&i.ConfirmationDeadline,
 		&i.CancelledAt,
+		&i.CarrierID,
+		&i.ShippingPrice,
+		&i.SellerRegionID,
+		&i.BuyerRegionID,
 	)
 	return i, err
 }
 
 const getOrdersPendingConfirmation = `-- name: GetOrdersPendingConfirmation :many
-SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at FROM orders 
+SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id FROM orders 
 WHERE confirmation_deadline < NOW() 
   AND status IN ('seller_confirmed', 'buyer_confirmed')
 ORDER BY confirmation_deadline ASC
@@ -356,6 +372,10 @@ func (q *Queries) GetOrdersPendingConfirmation(ctx context.Context) ([]Order, er
 			&i.SourcePublicID,
 			&i.ConfirmationDeadline,
 			&i.CancelledAt,
+			&i.CarrierID,
+			&i.ShippingPrice,
+			&i.SellerRegionID,
+			&i.BuyerRegionID,
 		); err != nil {
 			return nil, err
 		}
@@ -368,7 +388,7 @@ func (q *Queries) GetOrdersPendingConfirmation(ctx context.Context) ([]Order, er
 }
 
 const listOrdersByBuyRequest = `-- name: ListOrdersByBuyRequest :many
-SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at FROM orders WHERE buy_request_id = $1
+SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id FROM orders WHERE buy_request_id = $1
 `
 
 func (q *Queries) ListOrdersByBuyRequest(ctx context.Context, buyRequestID pgtype.Int4) ([]Order, error) {
@@ -405,6 +425,10 @@ func (q *Queries) ListOrdersByBuyRequest(ctx context.Context, buyRequestID pgtyp
 			&i.SourcePublicID,
 			&i.ConfirmationDeadline,
 			&i.CancelledAt,
+			&i.CarrierID,
+			&i.ShippingPrice,
+			&i.SellerRegionID,
+			&i.BuyerRegionID,
 		); err != nil {
 			return nil, err
 		}
@@ -417,7 +441,7 @@ func (q *Queries) ListOrdersByBuyRequest(ctx context.Context, buyRequestID pgtyp
 }
 
 const listOrdersBySellAuction = `-- name: ListOrdersBySellAuction :many
-SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at FROM orders WHERE sell_auction_id = $1
+SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id FROM orders WHERE sell_auction_id = $1
 `
 
 func (q *Queries) ListOrdersBySellAuction(ctx context.Context, sellAuctionID pgtype.Int4) ([]Order, error) {
@@ -454,6 +478,10 @@ func (q *Queries) ListOrdersBySellAuction(ctx context.Context, sellAuctionID pgt
 			&i.SourcePublicID,
 			&i.ConfirmationDeadline,
 			&i.CancelledAt,
+			&i.CarrierID,
+			&i.ShippingPrice,
+			&i.SellerRegionID,
+			&i.BuyerRegionID,
 		); err != nil {
 			return nil, err
 		}
@@ -466,7 +494,7 @@ func (q *Queries) ListOrdersBySellAuction(ctx context.Context, sellAuctionID pgt
 }
 
 const listOrdersByUser = `-- name: ListOrdersByUser :many
-SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at FROM orders WHERE seller_id = $1 OR buyer_id = $1
+SELECT id, public_id, sell_auction_id, buy_request_id, seller_id, buyer_id, final_price, quantity, unit, status, seller_confirmed_at, buyer_confirmed_at, completed_at, created_at, updated_at, seller_name, seller_phone, seller_region, buyer_name, buyer_phone, buyer_region, source_public_id, confirmation_deadline, cancelled_at, carrier_id, shipping_price, seller_region_id, buyer_region_id FROM orders WHERE seller_id = $1 OR buyer_id = $1
 ORDER BY created_at DESC LIMIT $2 OFFSET $3
 `
 
@@ -510,6 +538,10 @@ func (q *Queries) ListOrdersByUser(ctx context.Context, arg ListOrdersByUserPara
 			&i.SourcePublicID,
 			&i.ConfirmationDeadline,
 			&i.CancelledAt,
+			&i.CarrierID,
+			&i.ShippingPrice,
+			&i.SellerRegionID,
+			&i.BuyerRegionID,
 		); err != nil {
 			return nil, err
 		}

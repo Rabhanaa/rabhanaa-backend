@@ -64,10 +64,56 @@ func Auth(authService *authSvc.AuthService) gin.HandlerFunc {
 		}
 
 		c.Set("userID", int(user.ID))
+		// The role travels on the request rather than in the token: a JWT lives
+		// 365 days here, so a role baked into it would outlive any change to it.
+		// Auth already loaded the user for the revocation check above, so reading
+		// job_key costs nothing.
+		c.Set("jobKey", user.JobKey)
 
 		c.Next()
 	}
 }
+
+// Carrier gates the endpoints only a shipping company may reach (#14).
+// Mirrors Admin(): the role is already on the request, so this is a check
+// rather than a lookup.
+func Carrier() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("jobKey") != CarrierRoleKey {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error":   errs.ErrCarrierOnly.Error(),
+				"message": errs.GetArabicMessage(errs.ErrCarrierOnly),
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
+// NotCarrier keeps shipping companies out of the trading routes — creating
+// posts, bidding, making offers. A carrier account exists to quote on transport
+// and has no interests, no subscription and no reason to trade.
+//
+// Declared on the routes rather than inside each service: it is the same rule in
+// four places, the role is already on the request, and doing it here means no
+// extra query and no chance of landing after a quota has been spent.
+func NotCarrier() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.GetString("jobKey") == CarrierRoleKey {
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{
+				"error":   errs.ErrCarrierCannotTrade.Error(),
+				"message": errs.GetArabicMessage(errs.ErrCarrierCannotTrade),
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
+// CarrierRoleKey matches the jobs row added in migration 042. Duplicated from
+// auction/service rather than imported, because importing a service package
+// into middleware would invert the dependency.
+const CarrierRoleKey = "shipping_company"
 
 func Admin() gin.HandlerFunc {
 	return func(c *gin.Context) {

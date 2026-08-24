@@ -52,12 +52,30 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	job, err := s.repo.GetJobByID(ctx, req.JobID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get job: %w", err)
+	}
+	isCarrier := job.Key == CarrierRoleKey
+
+	// A carrier is shown jobs by governorate, so coverage is the one thing it
+	// cannot register without — with none, it would sign up to an empty screen.
+	if isCarrier && len(req.CarrierRegionIDs) == 0 {
+		return nil, errs.ErrCarrierRegionsRequired
+	}
+
 	// With document upload switched off (#12) there is nothing for the account to
 	// wait for, so parking it in pending_documents only mislabels it in the
 	// profile and drops it into the admin verification queue forever.
 	initialStatus := string(model.StatusActive)
 	if s.config.RequireDocuments {
 		initialStatus = string(model.StatusPendingDocuments)
+	}
+	// Carriers are the exception: the client asked for them to be vetted, so they
+	// wait for an admin however the documents flag is set. They can sign in and
+	// look around while they wait — quoting is what the Carrier guard withholds.
+	if isCarrier {
+		initialStatus = string(model.StatusPendingReview)
 	}
 
 	user, err := s.repo.CreateUser(ctx, sqlc.CreateUserParams{
@@ -83,6 +101,12 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 		return nil, fmt.Errorf("failed to update cached names: %w", err)
 	}
 
+	if isCarrier {
+		if err := s.saveCarrierSetup(ctx, user.ID, req); err != nil {
+			return nil, err
+		}
+	}
+
 	// Create free tier subscription for new user
 	_, err = s.repo.GetQueries().CreateUserSubscription(ctx, sqlc.CreateUserSubscriptionParams{
 		UserID:    user.ID,
@@ -100,11 +124,6 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 	region, err := s.repo.GetRegionByID(ctx, req.RegionID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get region: %w", err)
-	}
-
-	job, err := s.repo.GetJobByID(ctx, req.JobID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get job: %w", err)
 	}
 
 	publicID := uuid.UUID(user.PublicID.Bytes)
@@ -134,6 +153,46 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 			SuppliesToRetail: user.SuppliesToRetail,
 		},
 	}, nil
+}
+
+// CarrierRoleKey matches the jobs row added in migration 042.
+const CarrierRoleKey = "shipping_company"
+
+// saveCarrierSetup stores what a carrier registers with instead of interests:
+// the governorates it serves, and how it presents itself to merchants.
+//
+// Coverage is validated against regions rather than trusted, because it decides
+// which deals the account can see.
+func (s *AuthService) saveCarrierSetup(ctx context.Context, userID int32, req model.RegisterRequest) error {
+	for _, regionID := range req.CarrierRegionIDs {
+		if err := s.validateRegionExists(ctx, regionID); err != nil {
+			return err
+		}
+		if err := s.repo.GetQueries().AddCarrierRegion(ctx, sqlc.AddCarrierRegionParams{
+			UserID:   userID,
+			RegionID: regionID,
+		}); err != nil {
+			return fmt.Errorf("failed to add carrier region: %w", err)
+		}
+	}
+
+	logo := pgtype.Text{}
+	if req.CarrierLogoURL != nil && *req.CarrierLogoURL != "" {
+		logo = pgtype.Text{String: *req.CarrierLogoURL, Valid: true}
+	}
+	notes := pgtype.Text{}
+	if req.CarrierNotes != nil && *req.CarrierNotes != "" {
+		notes = pgtype.Text{String: *req.CarrierNotes, Valid: true}
+	}
+
+	if _, err := s.repo.GetQueries().UpsertCarrierProfile(ctx, sqlc.UpsertCarrierProfileParams{
+		UserID:  userID,
+		LogoUrl: logo,
+		Notes:   notes,
+	}); err != nil {
+		return fmt.Errorf("failed to save carrier profile: %w", err)
+	}
+	return nil
 }
 
 // validateRegionExists checks if the given region ID exists in the database
@@ -218,6 +277,7 @@ func dbUserToModel(u sqlc.User) *model.User {
 		PasswordChangedAt: u.PasswordChangedAt,
 		Name:              u.Name,
 		JobID:             u.JobID,
+		JobKey:            u.JobKey,
 		RegionID:          u.RegionID,
 		Status:            model.UserStatus(u.Status),
 		OTPHash:           u.OtpHash,

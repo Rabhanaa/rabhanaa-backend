@@ -22,7 +22,7 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	router.Use(middleware.Logging())
 
 	// Health check
-	configHandler := NewConfigHandler(ctx.Queries, ctx.Config)
+	configHandler := NewConfigHandler(ctx.Queries, ctx.Config, ctx.SettingsService)
 	router.GET("/health", configHandler.Health)
 
 	apiV1 := router.Group("/api/v1")
@@ -70,11 +70,6 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// anyone has logged in. The remaining values are UI hints.
 	publicRead.GET("/config", configHandler.GetConfig)
 
-	// Carrier directory. Authenticated rather than public like /regions, because
-	// it returns partner phone numbers.
-	shippingHandler := NewShippingHandler(ctx.Queries)
-	protected.GET("/shipping-companies", shippingHandler.ListForRegion)
-
 	protected.GET("/auth/me", authHandler.GetMe)
 	protected.GET("/auth/status", authHandler.GetStatus)
 	protected.POST("/auth/documents", authHandler.SubmitDocuments)
@@ -86,7 +81,7 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 
 	// Auction routes
 	sellHandler := NewSellAuctionHandler(ctx.SellAuctionService)
-	protected.POST("/sell-auctions", sellHandler.Create)
+	protected.POST("/sell-auctions", middleware.NotCarrier(), sellHandler.Create)
 	publicRead.GET("/sell-auctions", sellHandler.List)
 	publicRead.GET("/sell-auctions/search", sellHandler.Search)
 	protected.GET("/sell-auctions/mine", sellHandler.ListMine)
@@ -95,7 +90,7 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 
 	// Buy request routes
 	buyHandler := NewBuyRequestHandler(ctx.BuyRequestService)
-	protected.POST("/buy-requests", buyHandler.Create)
+	protected.POST("/buy-requests", middleware.NotCarrier(), buyHandler.Create)
 	publicRead.GET("/buy-requests", buyHandler.List)
 	publicRead.GET("/buy-requests/search", buyHandler.Search)
 	protected.GET("/buy-requests/mine", buyHandler.ListMine)
@@ -105,7 +100,7 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// Bid routes
 	sellBidHandler := NewSellBidHandler(ctx.SellBiddingService)
 	protected.GET("/sell-auctions/:id/bids", sellBidHandler.ListByAuction)
-	protected.POST("/sell-auctions/:id/bids", sellBidHandler.PlaceBid)
+	protected.POST("/sell-auctions/:id/bids", middleware.NotCarrier(), sellBidHandler.PlaceBid)
 	protected.GET("/my-bids/sell", sellBidHandler.ListMyBids)
 
 	// User bids summary route
@@ -115,8 +110,31 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// Supply offer routes
 	supplyOfferHandler := NewSupplyOfferHandler(ctx.SupplyOfferingService)
 	protected.GET("/buy-requests/:id/offers", supplyOfferHandler.ListByRequest)
-	protected.POST("/buy-requests/:id/offers", supplyOfferHandler.PlaceOffer)
+	protected.POST("/buy-requests/:id/offers", middleware.NotCarrier(), supplyOfferHandler.PlaceOffer)
 	protected.GET("/my-bids/supply", supplyOfferHandler.ListMyOffers)
+
+	// Shipping quotes (#14) — the merchant's side. Carriers offer a price on a
+	// deal; whoever owns that deal accepts one. Ownership is checked in the
+	// service, so these are ordinary protected routes.
+	shippingQuoteHandler := NewShippingQuoteHandler(ctx.ShippingService)
+	protected.GET("/orders/:id/shipping-quotes", shippingQuoteHandler.ListForOrder)
+	protected.GET("/sell-auctions/:id/shipping-quotes", shippingQuoteHandler.ListForSellAuction)
+	protected.GET("/buy-requests/:id/shipping-quotes", shippingQuoteHandler.ListForBuyRequest)
+	protected.POST("/shipping-quotes/:id/accept", shippingQuoteHandler.Accept)
+	protected.POST("/shipping-quotes/:id/reject", shippingQuoteHandler.Reject)
+
+	// Carrier-facing routes. Carrier() rejects every other role, so a merchant
+	// cannot browse the price-free job feed and a carrier cannot reach the
+	// trading routes above.
+	carrierGroup := protected.Group("/carrier")
+	carrierGroup.Use(middleware.Carrier())
+	carrierHandler := NewCarrierHandler(ctx.ShippingService)
+	carrierGroup.GET("/jobs", carrierHandler.ListJobs)
+	carrierGroup.POST("/jobs/:kind/:id/quotes", carrierHandler.CreateQuote)
+	carrierGroup.GET("/quotes", carrierHandler.ListMyQuotes)
+	carrierGroup.DELETE("/quotes/:id", carrierHandler.WithdrawQuote)
+	carrierGroup.GET("/profile", carrierHandler.GetProfile)
+	carrierGroup.PATCH("/profile", carrierHandler.UpdateProfile)
 
 	// Selection routes
 	sellSelectionHandler := NewSellSelectionHandler(ctx.SellSelectionService)
@@ -178,11 +196,6 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	adminGroup.GET("/issues/:id", issueHandler.AdminGetDetail)
 	adminGroup.PATCH("/issues/:id/close", issueHandler.AdminCloseIssue)
 
-	adminGroup.GET("/shipping-companies", shippingHandler.AdminList)
-	adminGroup.POST("/shipping-companies", shippingHandler.AdminCreate)
-	adminGroup.PATCH("/shipping-companies/:id", shippingHandler.AdminUpdate)
-	adminGroup.DELETE("/shipping-companies/:id", shippingHandler.AdminDeactivate)
-
 	moderationHandler := NewAdminModerationHandler(ctx.ModerationService)
 	adminGroup.GET("/posts/pending", moderationHandler.ListPending)
 	adminGroup.GET("/posts/published", moderationHandler.ListPublished)
@@ -190,6 +203,10 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	adminGroup.POST("/posts/:id/reject", moderationHandler.Reject)
 	adminGroup.POST("/posts/:id/suspend", moderationHandler.Suspend)
 	adminGroup.POST("/posts/:id/unsuspend", moderationHandler.Unsuspend)
+
+	settingsHandler := NewAdminSettingsHandler(ctx.SettingsService)
+	adminGroup.GET("/settings", settingsHandler.List)
+	adminGroup.PATCH("/settings", settingsHandler.Update)
 
 	analyticsHandler := NewAdminAnalyticsHandler(ctx.AnalyticsService)
 	adminGroup.GET("/analytics/overview", analyticsHandler.Overview)

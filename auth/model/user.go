@@ -35,6 +35,7 @@ type User struct {
 	PasswordHash      pgtype.Text
 	Name              string
 	JobID             pgtype.Int4
+	JobKey            string
 	RegionID          pgtype.Int4
 	Status            UserStatus
 	OTPHash           pgtype.Text

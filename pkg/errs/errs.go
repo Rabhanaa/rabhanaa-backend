@@ -24,6 +24,18 @@ var (
 	ErrInvalidRegionID          = errors.New("INVALID_REGION_ID")
 	ErrInvalidJobID             = errors.New("INVALID_JOB_ID")
 	ErrInvalidSignupSource      = errors.New("INVALID_SIGNUP_SOURCE")
+
+	// Carrier accounts (#14).
+	ErrCarrierOnly            = errors.New("CARRIER_ONLY")
+	ErrCarrierCannotTrade     = errors.New("CARRIER_CANNOT_TRADE")
+	ErrCarrierRegionsRequired = errors.New("CARRIER_REGIONS_REQUIRED")
+	ErrQuoteNotFound          = errors.New("QUOTE_NOT_FOUND")
+	ErrQuoteNotPending        = errors.New("QUOTE_NOT_PENDING")
+	ErrAlreadyQuoted          = errors.New("ALREADY_QUOTED")
+	ErrJobNotQuotable         = errors.New("JOB_NOT_QUOTABLE")
+	ErrQuoteStageDisabled     = errors.New("QUOTE_STAGE_DISABLED")
+	ErrUnknownSetting         = errors.New("UNKNOWN_SETTING")
+	ErrInvalidSettingValue    = errors.New("INVALID_SETTING_VALUE")
 )
 
 var (
@@ -99,6 +111,16 @@ var ArabicMessages = map[string]string{
 	"INVALID_POST_TYPE":           "نوع المنشور غير صحيح",
 	"SHIPPING_COMPANY_NOT_FOUND":  "شركة الشحن غير موجودة",
 	"RETAILER_CANNOT_SELL":        "حساب تاجر التجزئة مخصص للشراء — يمكنك إنشاء طلب شراء",
+	"CARRIER_ONLY":                "هذا الإجراء لشركات الشحن فقط",
+	"CARRIER_CANNOT_TRADE":        "حساب شركة الشحن مخصص لعروض النقل فقط",
+	"CARRIER_REGIONS_REQUIRED":    "اختر محافظة واحدة على الأقل تقوم بالشحن إليها",
+	"QUOTE_NOT_FOUND":             "عرض الشحن غير موجود",
+	"QUOTE_NOT_PENDING":           "تم الرد على عرض الشحن بالفعل",
+	"ALREADY_QUOTED":              "لقد قدمت عرضاً على هذه الشحنة بالفعل",
+	"JOB_NOT_QUOTABLE":            "لا يمكن تقديم عرض شحن على هذه الصفقة",
+	"QUOTE_STAGE_DISABLED":        "تقديم عروض الشحن غير متاح في هذه المرحلة",
+	"UNKNOWN_SETTING":             "إعداد غير معروف",
+	"INVALID_SETTING_VALUE":       "قيمة الإعداد غير صحيحة",
 	"INVALID_RESET_CODE":          "الرمز غير صحيح",
 	"RESET_CODE_EXPIRED":          "انتهت صلاحية الرمز — اطلب رمزاً جديداً",
 	"INVALID_PASSWORD":            "كلمة المرور يجب أن تكون 8-16 حرفاً وتحتوي على حرف كبير وصغير ورقم ورمز",

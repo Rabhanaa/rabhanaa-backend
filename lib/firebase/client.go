@@ -67,6 +67,18 @@ func (c *Client) buildLink(data map[string]string) string {
 		if id := data["request_id"]; id != "" {
 			return c.baseURL + "/auctions/buy/" + id
 		}
+	// Shipping quotes (#14). The merchant lands on the deal to compare prices;
+	// the carrier lands on the same place to see the verdict in context.
+	case "shipping_quote_received", "shipping_quote_accepted", "shipping_quote_rejected":
+		if id := data["order_id"]; id != "" {
+			return c.baseURL + "/orders/" + id
+		}
+		if id := data["auction_id"]; id != "" {
+			return c.baseURL + "/auctions/sell/" + id
+		}
+		if id := data["request_id"]; id != "" {
+			return c.baseURL + "/auctions/buy/" + id
+		}
 	// Moderation verdicts (#18) — either kind of post, so try both ids.
 	case "post_approved", "post_rejected", "post_suspended":
 		if id := data["auction_id"]; id != "" {

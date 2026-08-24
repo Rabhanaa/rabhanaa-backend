@@ -256,6 +256,11 @@ WHERE ui.interest_id = $1::int
   -- Nobody should be told about a post their feed hides: retailers cannot fill a
   -- buy request, and they only see sell posts from supply-side merchants.
   AND ($4::bool = false OR u.job_key <> 'retailer')
+  -- Carriers never trade, so a new-listing notification has nothing in it for
+  -- them. Belt and braces: they also pick no interests, so the join above should
+  -- already exclude them — but that is a data accident, not a rule, and one
+  -- stray interest row would start spamming them.
+  AND u.job_key <> 'shipping_company'
 `
 
 type GetActiveUsersByInterestParams struct {

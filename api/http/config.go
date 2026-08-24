@@ -7,15 +7,17 @@ import (
 
 	appctx "rabhana/api/context"
 	"rabhana/db/sqlc"
+	settingsSvc "rabhana/settings/service"
 )
 
 type ConfigHandler struct {
-	queries *sqlc.Queries
-	config  *appctx.AppConfig
+	queries  *sqlc.Queries
+	config   *appctx.AppConfig
+	settings *settingsSvc.Service
 }
 
-func NewConfigHandler(queries *sqlc.Queries, config *appctx.AppConfig) *ConfigHandler {
-	return &ConfigHandler{queries: queries, config: config}
+func NewConfigHandler(queries *sqlc.Queries, config *appctx.AppConfig, settings *settingsSvc.Service) *ConfigHandler {
+	return &ConfigHandler{queries: queries, config: config, settings: settings}
 }
 
 func (h *ConfigHandler) GetConfig(c *gin.Context) {
@@ -33,7 +35,10 @@ func (h *ConfigHandler) GetConfig(c *gin.Context) {
 		"require_documents":             h.config.RequireDocuments,
 		"region_filter_enabled":         h.config.RegionFilterEnabled,
 		"post_approval_enabled":         h.config.PostApprovalEnabled,
-		"units":                         []string{"kg", "ton", "piece", "box"},
+		// Where carriers quote (#14). Unlike the flags above this one is stored in
+		// app_settings, because the client changes it from the admin panel.
+		"carrier_quote_stage": h.settings.CarrierQuoteStage(),
+		"units":               []string{"kg", "ton", "piece", "box"},
 	})
 }
 

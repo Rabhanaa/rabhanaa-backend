@@ -51,7 +51,13 @@ func (s *AuthService) ListPendingUsers(ctx context.Context, limit, offset int32)
 			t := u.StatusChangedAt.Time
 			response.StatusChangedAt = &t
 		}
-		// TODO: region_name/job_name/interests need joined query — see B-MOCKABLE in admin-dashboard-plan.md
+		// The role matters in these lists now that carriers (#14) wait for approval
+		// alongside merchants — approving a shipping company is a different
+		// decision from approving a trader. Cached on the row by 022 and 040, so
+		// the joined query the old TODO asked for is not needed.
+		response.RegionName = u.RegionName
+		response.JobName = u.JobName
+		response.JobKey = u.JobKey
 		responses = append(responses, response)
 	}
 
@@ -238,7 +244,13 @@ func (s *AuthService) ListAllUsers(ctx context.Context, status string, limit, of
 			t := u.StatusChangedAt.Time
 			response.StatusChangedAt = &t
 		}
-		// TODO: region_name/job_name/interests need joined query — see B-MOCKABLE in admin-dashboard-plan.md
+		// The role matters in these lists now that carriers (#14) wait for approval
+		// alongside merchants — approving a shipping company is a different
+		// decision from approving a trader. Cached on the row by 022 and 040, so
+		// the joined query the old TODO asked for is not needed.
+		response.RegionName = u.RegionName
+		response.JobName = u.JobName
+		response.JobKey = u.JobKey
 		responses = append(responses, response)
 	}
 
@@ -417,7 +429,13 @@ func (s *AuthService) SearchUsers(ctx context.Context, q, status string, limit, 
 			t := u.StatusChangedAt.Time
 			response.StatusChangedAt = &t
 		}
-		// TODO: region_name/job_name/interests need joined query — see B-MOCKABLE in admin-dashboard-plan.md
+		// The role matters in these lists now that carriers (#14) wait for approval
+		// alongside merchants — approving a shipping company is a different
+		// decision from approving a trader. Cached on the row by 022 and 040, so
+		// the joined query the old TODO asked for is not needed.
+		response.RegionName = u.RegionName
+		response.JobName = u.JobName
+		response.JobKey = u.JobKey
 		responses = append(responses, response)
 	}
 

@@ -22,6 +22,8 @@ import (
 	notificationSvcPkg "rabhana/notification/service"
 	orderRepoPkg "rabhana/order/repository"
 	orderSvcPkg "rabhana/order/service"
+	settingsSvcPkg "rabhana/settings/service"
+	shippingSvcPkg "rabhana/shipping/service"
 	subscriptionSvcPkg "rabhana/subscription/service"
 	uploadSvcPkg "rabhana/upload/service"
 )
@@ -47,6 +49,8 @@ type AppContext struct {
 	UploadService            *uploadSvcPkg.UploadService
 	AnalyticsService         *analyticsSvcPkg.AnalyticsService
 	ModerationService        *auctionSvcPkg.ModerationService
+	SettingsService          *settingsSvcPkg.Service
+	ShippingService          *shippingSvcPkg.Service
 
 	// Repositories (for handlers that need direct access)
 	SellBidRepo     auctionRepoPkg.SellBidRepository
@@ -106,6 +110,14 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 
 	// Auth service wired after notification service so it can dispatch alerts
 	authService := authSvcPkg.NewAuthService(authRepository, authConfig, notificationService, emailClient)
+
+	// Settings an admin can change without a redeploy. Loaded once here; writes
+	// refresh the cache in place.
+	settingsService := settingsSvcPkg.NewService(queries)
+	settingsService.Load(ctx)
+
+	// Carrier accounts and shipping quotes (#14).
+	shippingService := shippingSvcPkg.NewService(queries, settingsService, notificationService)
 
 	// Subscription admin service
 	subscriptionAdminSvc := subscriptionSvcPkg.NewAdminService(queries, authRepository)
@@ -232,6 +244,8 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		UploadService:            uploadService,
 		AnalyticsService:         analyticsService,
 		ModerationService:        moderationService,
+		SettingsService:          settingsService,
+		ShippingService:          shippingService,
 		SellBidRepo:              sellBidRepo,
 		SupplyOfferRepo:          supplyOfferRepo,
 	}, nil

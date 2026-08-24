@@ -139,6 +139,9 @@ func (s *SellAuctionService) CreateSellAuction(ctx context.Context, userID int32
 	if user.JobKey == RetailerRoleKey {
 		return nil, errs.ErrRetailerCannotSell
 	}
+	if isCarrier(user.JobKey) {
+		return nil, errs.ErrCarrierCannotTrade
+	}
 
 	region, err := s.queries.GetRegionByID(ctx, regionID)
 	if err != nil {
@@ -437,6 +440,17 @@ var SupplySideRoles = []string{"importer", "wholesaler", "distributor", "process
 
 // RetailerRoleKey matches the jobs row added in migration 040.
 const RetailerRoleKey = "retailer"
+
+// CarrierRoleKey matches the jobs row added in migration 042. Kept in step with
+// the copy in api/http/middleware, which cannot import this package.
+const CarrierRoleKey = "shipping_company"
+
+// isCarrier reports whether this role moves goods rather than trades them. A
+// carrier has no interests, cannot post, bid or offer, and exists only to quote
+// on transport — so every trade entry point turns it away.
+func isCarrier(jobKey string) bool {
+	return jobKey == CarrierRoleKey
+}
 
 // viewerContext is what a listing request needs to know about whoever is asking:
 // which governorate to scope to (#11) and whether they are a retailer (#7). One

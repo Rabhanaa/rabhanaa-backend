@@ -8,6 +8,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppSetting struct {
+	Key              string             `json:"key"`
+	Value            string             `json:"value"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	UpdatedByAdminID pgtype.Int4        `json:"updated_by_admin_id"`
+}
+
 type BuyRequest struct {
 	ID                     int32              `json:"id"`
 	PublicID               pgtype.UUID        `json:"public_id"`
@@ -36,6 +43,19 @@ type BuyRequest struct {
 	ModerationReason       pgtype.Text        `json:"moderation_reason"`
 	ModeratedByAdminID     pgtype.Int4        `json:"moderated_by_admin_id"`
 	ModeratedAt            pgtype.Timestamptz `json:"moderated_at"`
+}
+
+type CarrierProfile struct {
+	UserID    int32              `json:"user_id"`
+	LogoUrl   pgtype.Text        `json:"logo_url"`
+	Notes     pgtype.Text        `json:"notes"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type CarrierRegion struct {
+	UserID   int32 `json:"user_id"`
+	RegionID int32 `json:"region_id"`
 }
 
 type DeviceToken struct {
@@ -148,6 +168,10 @@ type Order struct {
 	SourcePublicID       pgtype.UUID        `json:"source_public_id"`
 	ConfirmationDeadline pgtype.Timestamptz `json:"confirmation_deadline"`
 	CancelledAt          pgtype.Timestamptz `json:"cancelled_at"`
+	CarrierID            pgtype.Int4        `json:"carrier_id"`
+	ShippingPrice        pgtype.Numeric     `json:"shipping_price"`
+	SellerRegionID       pgtype.Int4        `json:"seller_region_id"`
+	BuyerRegionID        pgtype.Int4        `json:"buyer_region_id"`
 }
 
 type PasswordResetCode struct {
@@ -236,21 +260,19 @@ type SellBid struct {
 	IsNotChosen      bool               `json:"is_not_chosen"`
 }
 
-type ShippingCompany struct {
-	ID        int32              `json:"id"`
-	PublicID  pgtype.UUID        `json:"public_id"`
-	Name      string             `json:"name"`
-	Phone     string             `json:"phone"`
-	LogoUrl   pgtype.Text        `json:"logo_url"`
-	Notes     pgtype.Text        `json:"notes"`
-	IsActive  bool               `json:"is_active"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
-}
-
-type ShippingCompanyRegion struct {
-	ShippingCompanyID int32 `json:"shipping_company_id"`
-	RegionID          int32 `json:"region_id"`
+type ShippingQuote struct {
+	ID            int32              `json:"id"`
+	PublicID      pgtype.UUID        `json:"public_id"`
+	CarrierID     int32              `json:"carrier_id"`
+	SellAuctionID pgtype.Int4        `json:"sell_auction_id"`
+	BuyRequestID  pgtype.Int4        `json:"buy_request_id"`
+	OrderID       pgtype.Int4        `json:"order_id"`
+	Price         pgtype.Numeric     `json:"price"`
+	Notes         pgtype.Text        `json:"notes"`
+	Status        string             `json:"status"`
+	AcceptedAt    pgtype.Timestamptz `json:"accepted_at"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Subscription struct {

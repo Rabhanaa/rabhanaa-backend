@@ -29,6 +29,11 @@ const (
 	EventPostApproved  EventType = "post_approved"
 	EventPostRejected  EventType = "post_rejected"
 	EventPostSuspended EventType = "post_suspended"
+
+	// Shipping quotes (#14).
+	EventShippingQuoteReceived EventType = "shipping_quote_received"
+	EventShippingQuoteAccepted EventType = "shipping_quote_accepted"
+	EventShippingQuoteRejected EventType = "shipping_quote_rejected"
 )
 
 var NotificationMessages = map[EventType]struct{ Title, Body string }{
@@ -57,4 +62,9 @@ var NotificationMessages = map[EventType]struct{ Title, Body string }{
 	EventPostApproved:  {"تم نشر منشورك", "تمت الموافقة على منشورك وهو الآن متاح للجميع"},
 	EventPostRejected:  {"لم تتم الموافقة على منشورك", "تم رفض المنشور"},
 	EventPostSuspended: {"تم إيقاف منشورك", "تم إيقاف المنشور مؤقتاً"},
+	// The merchant is told a price arrived, not what it is: they open the deal to
+	// compare it against the others, and a push notification is not private.
+	EventShippingQuoteReceived: {"عرض شحن جديد", "وصلك عرض لشحن صفقتك"},
+	EventShippingQuoteAccepted: {"تم قبول عرض الشحن", "وافق التاجر على عرضك — تفاصيل التواصل متاحة الآن"},
+	EventShippingQuoteRejected: {"لم يتم اختيار عرضك", "تم اختيار شركة شحن أخرى لهذه الصفقة"},
 }

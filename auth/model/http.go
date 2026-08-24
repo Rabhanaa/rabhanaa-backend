@@ -13,6 +13,13 @@ type RegisterRequest struct {
 	// Only meaningful for supply-side roles (importer, wholesaler, distributor,
 	// processor, supplier); ignored for the rest.
 	SuppliesToRetail bool `json:"supplies_to_retail"`
+	// Governorates a shipping company covers (#14). Required for that role and
+	// ignored for every other — a carrier picks coverage where a merchant picks
+	// interests, because it is what decides which jobs they are shown.
+	CarrierRegionIDs []int32 `json:"carrier_region_ids"`
+	// Optional carrier presentation.
+	CarrierLogoURL *string `json:"carrier_logo_url"`
+	CarrierNotes   *string `json:"carrier_notes"`
 }
 
 type ProfileRequest struct {
