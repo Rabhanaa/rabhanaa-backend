@@ -82,24 +82,31 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// Auction routes
 	sellHandler := NewSellAuctionHandler(ctx.SellAuctionService)
 	protected.POST("/sell-auctions", middleware.NotCarrier(), sellHandler.Create)
-	publicRead.GET("/sell-auctions", sellHandler.List)
-	publicRead.GET("/sell-auctions/search", sellHandler.Search)
+	// NotCarrier on public routes: a carrier reads the price-free job feed, and
+	// letting the same account fetch the merchant feed would make that pointless.
+	// It only bites a carrier presenting a token — anonymous callers are what #4
+	// opened these up for, and a signed-out carrier is indistinguishable from one.
+	publicRead.GET("/sell-auctions", middleware.NotCarrier(), sellHandler.List)
+	publicRead.GET("/sell-auctions/search", middleware.NotCarrier(), sellHandler.Search)
 	protected.GET("/sell-auctions/mine", sellHandler.ListMine)
-	publicRead.GET("/sell-auctions/:id", sellHandler.GetDetail)
+	publicRead.GET("/sell-auctions/:id", middleware.NotCarrier(), sellHandler.GetDetail)
 	protected.POST("/sell-auctions/:id/cancel", sellHandler.Cancel)
 
 	// Buy request routes
 	buyHandler := NewBuyRequestHandler(ctx.BuyRequestService)
 	protected.POST("/buy-requests", middleware.NotCarrier(), buyHandler.Create)
-	publicRead.GET("/buy-requests", buyHandler.List)
-	publicRead.GET("/buy-requests/search", buyHandler.Search)
+	publicRead.GET("/buy-requests", middleware.NotCarrier(), buyHandler.List)
+	publicRead.GET("/buy-requests/search", middleware.NotCarrier(), buyHandler.Search)
 	protected.GET("/buy-requests/mine", buyHandler.ListMine)
-	publicRead.GET("/buy-requests/:id", buyHandler.GetDetail)
+	publicRead.GET("/buy-requests/:id", middleware.NotCarrier(), buyHandler.GetDetail)
 	protected.POST("/buy-requests/:id/cancel", buyHandler.Cancel)
 
 	// Bid routes
 	sellBidHandler := NewSellBidHandler(ctx.SellBiddingService)
-	protected.GET("/sell-auctions/:id/bids", sellBidHandler.ListByAuction)
+	// Bid and offer lists are merchant market data — a carrier prices transport,
+	// not goods. Bids already refuse non-owners; offers do not, so this is the only
+	// thing standing between a carrier and every supplier's price.
+	protected.GET("/sell-auctions/:id/bids", middleware.NotCarrier(), sellBidHandler.ListByAuction)
 	protected.POST("/sell-auctions/:id/bids", middleware.NotCarrier(), sellBidHandler.PlaceBid)
 	protected.GET("/my-bids/sell", sellBidHandler.ListMyBids)
 
@@ -109,7 +116,7 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 
 	// Supply offer routes
 	supplyOfferHandler := NewSupplyOfferHandler(ctx.SupplyOfferingService)
-	protected.GET("/buy-requests/:id/offers", supplyOfferHandler.ListByRequest)
+	protected.GET("/buy-requests/:id/offers", middleware.NotCarrier(), supplyOfferHandler.ListByRequest)
 	protected.POST("/buy-requests/:id/offers", middleware.NotCarrier(), supplyOfferHandler.PlaceOffer)
 	protected.GET("/my-bids/supply", supplyOfferHandler.ListMyOffers)
 

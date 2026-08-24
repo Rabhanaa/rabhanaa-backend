@@ -172,6 +172,9 @@ func OptionalAuth(authService *authSvc.AuthService) gin.HandlerFunc {
 		c.Set("userPublicID", claims.UserID.String())
 		c.Set("isAdmin", claims.IsAdmin)
 		c.Set("userID", int(user.ID))
+		// The role, so NotCarrier can act on these public routes too. Anonymous
+		// callers never reach here, so an empty jobKey still means "visitor".
+		c.Set("jobKey", user.JobKey)
 		c.Next()
 	}
 }
