@@ -26,6 +26,7 @@ type CronService struct {
 	seedService        *SeedService
 	notificationSender NotificationSender
 	queries            *sqlc.Queries
+	commission         CommissionProcessor
 	selectionWindow    int32
 	regionFilter       bool
 	ticker             *time.Ticker
@@ -42,6 +43,7 @@ func NewCronService(
 	notificationSender NotificationSender,
 	seedService *SeedService,
 	queries *sqlc.Queries,
+	commission CommissionProcessor,
 	selectionWindowHours int,
 	regionFilter bool,
 ) *CronService {
@@ -55,6 +57,7 @@ func NewCronService(
 		notificationSender: notificationSender,
 		seedService:        seedService,
 		queries:            queries,
+		commission:         commission,
 		selectionWindow:    int32(selectionWindowHours),
 		regionFilter:       regionFilter,
 	}
@@ -99,6 +102,27 @@ func (c *CronService) run() {
 	c.processExpiredOrders(ctx)
 	c.processExpiredSessions(ctx)
 	c.processMotivationalMessages(ctx)
+	c.processCommissions(ctx)
+}
+
+// processCommissions accrues charges for newly completed sales and, on the
+// configured closing weekday, issues the week's invoices (#13).
+//
+// Both are cheap no-ops on a normal tick: accrual queries for completed orders
+// with no charge row, and invoicing returns immediately unless today is the
+// closing day. Errors are logged and retried on the next tick rather than
+// retried in place — nothing here is time-critical, and a charge that fails to
+// write is picked up a minute later because no row was created.
+func (c *CronService) processCommissions(ctx context.Context) {
+	if c.commission == nil {
+		return
+	}
+	if _, err := c.commission.AccrueCharges(ctx); err != nil {
+		slog.Error("failed to accrue commission charges", "error", err)
+	}
+	if _, err := c.commission.IssueWeeklyInvoices(ctx, time.Now()); err != nil {
+		slog.Error("failed to issue commission invoices", "error", err)
+	}
 }
 
 func (c *CronService) seedAuctions(ctx context.Context) {
@@ -398,4 +422,12 @@ func (c *CronService) ownerIsSupplySide(ctx context.Context, ownerID int32) bool
 		return false
 	}
 	return isSupplySideRole(owner.JobKey)
+}
+
+// CommissionProcessor is the slice of the commission service the scheduler needs
+// (#13). An interface rather than the concrete type so this package does not
+// import commission/service, which would close an import cycle.
+type CommissionProcessor interface {
+	AccrueCharges(ctx context.Context) (int, error)
+	IssueWeeklyInvoices(ctx context.Context, now time.Time) (int, error)
 }

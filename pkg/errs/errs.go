@@ -84,10 +84,17 @@ var (
 )
 
 var (
-	ErrNoSubscription            = errors.New("NO_SUBSCRIPTION")
-	ErrInsufficientTier          = errors.New("INSUFFICIENT_TIER")
-	ErrMonthlyLimit              = errors.New("MONTHLY_LIMIT_REACHED")
-	ErrStorageUnavailable        = errors.New("STORAGE_UNAVAILABLE")
+	ErrNoSubscription     = errors.New("NO_SUBSCRIPTION")
+	ErrInsufficientTier   = errors.New("INSUFFICIENT_TIER")
+	ErrMonthlyLimit       = errors.New("MONTHLY_LIMIT_REACHED")
+	ErrStorageUnavailable = errors.New("STORAGE_UNAVAILABLE")
+
+	// Platform commission (#13).
+	// The Arabic message for USER_NOT_FOUND already existed; the error value did
+	// not, because nothing had needed to return it until commission lookups.
+	ErrUserNotFound              = errors.New("USER_NOT_FOUND")
+	ErrInvoiceNotFound           = errors.New("INVOICE_NOT_FOUND")
+	ErrInvoiceNotPayable         = errors.New("INVOICE_NOT_PAYABLE")
 	ErrSubscriptionAlreadyExists = errors.New("SUBSCRIPTION_ALREADY_EXISTS")
 	ErrSubscriptionNotFound      = errors.New("SUBSCRIPTION_NOT_FOUND")
 	ErrInvalidTier               = errors.New("INVALID_TIER")
@@ -151,6 +158,9 @@ var ArabicMessages = map[string]string{
 	"INSUFFICIENT_TIER":           "اشتراكك الحالي لا يسمح بهذا الإجراء - تواصل معنا للترقية",
 	"MONTHLY_LIMIT_REACHED":       "وصلت للحد الشهري المسموح به - تواصل معنا للترقية",
 	"STORAGE_UNAVAILABLE":         "الخدمة التخزينية غير متاحة",
+	"USER_NOT_FOUND":              "المستخدم غير موجود",
+	"INVOICE_NOT_FOUND":           "الفاتورة غير موجودة",
+	"INVOICE_NOT_PAYABLE":         "تم تحصيل هذه الفاتورة أو إلغاؤها بالفعل",
 	"SUBSCRIPTION_ALREADY_EXISTS": "الاشتراك موجود بالفعل",
 	"SUBSCRIPTION_NOT_FOUND":      "الاشتراك غير موجود",
 	"INVALID_TIER":                "الباقة غير صحيحة",

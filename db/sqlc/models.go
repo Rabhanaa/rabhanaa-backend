@@ -58,6 +58,39 @@ type CarrierRegion struct {
 	RegionID int32 `json:"region_id"`
 }
 
+type CommissionCharge struct {
+	ID               int32              `json:"id"`
+	PublicID         pgtype.UUID        `json:"public_id"`
+	OrderID          int32              `json:"order_id"`
+	SellerID         int32              `json:"seller_id"`
+	DealValue        pgtype.Numeric     `json:"deal_value"`
+	RatePercent      pgtype.Numeric     `json:"rate_percent"`
+	Amount           pgtype.Numeric     `json:"amount"`
+	OrderCompletedAt pgtype.Timestamptz `json:"order_completed_at"`
+	InvoiceID        pgtype.Int4        `json:"invoice_id"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+type CommissionInvoice struct {
+	ID                int32              `json:"id"`
+	PublicID          pgtype.UUID        `json:"public_id"`
+	SellerID          int32              `json:"seller_id"`
+	PeriodStart       pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd         pgtype.Timestamptz `json:"period_end"`
+	TotalAmount       pgtype.Numeric     `json:"total_amount"`
+	Status            string             `json:"status"`
+	IssuedAt          pgtype.Timestamptz `json:"issued_at"`
+	DueAt             pgtype.Timestamptz `json:"due_at"`
+	PaidAt            pgtype.Timestamptz `json:"paid_at"`
+	PaymentMethod     pgtype.Text        `json:"payment_method"`
+	PaymentReference  pgtype.Text        `json:"payment_reference"`
+	PaymentNote       pgtype.Text        `json:"payment_note"`
+	WaivedReason      pgtype.Text        `json:"waived_reason"`
+	RecordedByAdminID pgtype.Int4        `json:"recorded_by_admin_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
 type DeviceToken struct {
 	ID        int32              `json:"id"`
 	UserID    int32              `json:"user_id"`
@@ -305,6 +338,11 @@ type SubscriptionTier struct {
 	DescriptionEn           pgtype.Text        `json:"description_en"`
 	CreatedAt               pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt               pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SuppliesToRetailBackfill struct {
+	UserID    int32              `json:"user_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
 type SupplyOffer struct {

@@ -34,6 +34,10 @@ const (
 	EventShippingQuoteReceived EventType = "shipping_quote_received"
 	EventShippingQuoteAccepted EventType = "shipping_quote_accepted"
 	EventShippingQuoteRejected EventType = "shipping_quote_rejected"
+
+	// Platform commission (#13). Issued weekly; the seller settles it with the
+	// admin off-platform.
+	EventCommissionInvoiceIssued EventType = "commission_invoice_issued"
 )
 
 var NotificationMessages = map[EventType]struct{ Title, Body string }{
@@ -64,7 +68,8 @@ var NotificationMessages = map[EventType]struct{ Title, Body string }{
 	EventPostSuspended: {"تم إيقاف منشورك", "تم إيقاف المنشور مؤقتاً"},
 	// The merchant is told a price arrived, not what it is: they open the deal to
 	// compare it against the others, and a push notification is not private.
-	EventShippingQuoteReceived: {"عرض شحن جديد", "وصلك عرض لشحن صفقتك"},
-	EventShippingQuoteAccepted: {"تم قبول عرض الشحن", "وافق التاجر على عرضك — تفاصيل التواصل متاحة الآن"},
-	EventShippingQuoteRejected: {"لم يتم اختيار عرضك", "تم اختيار شركة شحن أخرى لهذه الصفقة"},
+	EventShippingQuoteReceived:   {"عرض شحن جديد", "وصلك عرض لشحن صفقتك"},
+	EventShippingQuoteAccepted:   {"تم قبول عرض الشحن", "وافق التاجر على عرضك — تفاصيل التواصل متاحة الآن"},
+	EventCommissionInvoiceIssued: {"عمولة المنصة", "صدرت فاتورة عمولة الأسبوع — يمكنك مراجعتها من حسابك"},
+	EventShippingQuoteRejected:   {"لم يتم اختيار عرضك", "تم اختيار شركة شحن أخرى لهذه الصفقة"},
 }

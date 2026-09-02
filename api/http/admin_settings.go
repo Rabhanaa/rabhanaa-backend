@@ -32,6 +32,7 @@ func (h *AdminSettingsHandler) List(c *gin.Context) {
 			service.KeyCarrierQuoteStage: []string{
 				service.StageOrder, service.StagePost, service.StageBoth,
 			},
+			service.KeyCommissionWeekCloseDay: service.CommissionWeekDays,
 		},
 	})
 }

@@ -223,3 +223,8 @@ func (s *SeedService) SeedAuctions(ctx context.Context) error {
 	slog.Info("seed completed", "sell_auctions", 30, "buy_requests", 30, "interests", len(interests), "regions", len(regions))
 	return nil
 }
+
+// SeedUserEmail identifies the account the seeder posts as. Exported so other
+// packages can exclude synthetic activity — commission must never bill it (#13)
+// — without redeclaring the address and letting the two drift apart.
+const SeedUserEmail = seedUserEmail

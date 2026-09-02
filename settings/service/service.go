@@ -13,9 +13,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/shopspring/decimal"
 
 	"rabhana/db/sqlc"
 )
@@ -24,6 +27,16 @@ import (
 const (
 	// KeyCarrierQuoteStage decides where shipping companies quote (#14).
 	KeyCarrierQuoteStage = "carrier_quote_stage"
+
+	// Platform commission (#13). The rate is snapshotted onto every charge when
+	// it accrues, so changing it here only affects future sales.
+	KeyCommissionRatePercent = "commission_rate_percent"
+	// KeyCommissionWeekCloseDay is the weekday the weekly invoice run fires, in
+	// Africa/Cairo.
+	KeyCommissionWeekCloseDay = "commission_week_close_day"
+	// KeyCommissionGraceDays is how long a seller has to pay before the admin
+	// worklist flags them. Stored onto each invoice as due_at at issue time.
+	KeyCommissionGraceDays = "commission_grace_days"
 )
 
 // Values for KeyCarrierQuoteStage.
@@ -39,16 +52,69 @@ const (
 	StageBoth = "both"
 )
 
-var allowed = map[string]map[string]struct{}{
-	KeyCarrierQuoteStage: {
-		StageOrder: {},
-		StagePost:  {},
-		StageBoth:  {},
-	},
+// A setting is validated by a function rather than a value set, because #13
+// added numeric settings (a rate, a number of days) that an enum cannot express.
+type validator func(string) bool
+
+func oneOf(values ...string) validator {
+	set := make(map[string]struct{}, len(values))
+	for _, v := range values {
+		set[v] = struct{}{}
+	}
+	return func(candidate string) bool {
+		_, ok := set[candidate]
+		return ok
+	}
+}
+
+// Bounded on both sides: a rate of 150% or a grace period of ten years is a
+// typo, and this table is the only thing standing between a typo and the
+// platform's billing.
+func decimalRange(min, max float64) validator {
+	return func(candidate string) bool {
+		d, err := decimal.NewFromString(candidate)
+		if err != nil {
+			return false
+		}
+		return d.GreaterThanOrEqual(decimal.NewFromFloat(min)) &&
+			d.LessThanOrEqual(decimal.NewFromFloat(max))
+	}
+}
+
+func intRange(min, max int) validator {
+	return func(candidate string) bool {
+		n, err := strconv.Atoi(candidate)
+		if err != nil {
+			return false
+		}
+		return n >= min && n <= max
+	}
+}
+
+// CommissionWeekDays is the accepted set, ordered for display. Exported so the
+// admin API offers exactly what the validator accepts.
+var CommissionWeekDays = []string{
+	"saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday",
+}
+
+var weekdays = map[string]time.Weekday{
+	"sunday": time.Sunday, "monday": time.Monday, "tuesday": time.Tuesday,
+	"wednesday": time.Wednesday, "thursday": time.Thursday,
+	"friday": time.Friday, "saturday": time.Saturday,
+}
+
+var allowed = map[string]validator{
+	KeyCarrierQuoteStage:      oneOf(StageOrder, StagePost, StageBoth),
+	KeyCommissionRatePercent:  decimalRange(0, 100),
+	KeyCommissionWeekCloseDay: oneOf(CommissionWeekDays...),
+	KeyCommissionGraceDays:    intRange(0, 90),
 }
 
 var defaults = map[string]string{
-	KeyCarrierQuoteStage: StageOrder,
+	KeyCarrierQuoteStage:      StageOrder,
+	KeyCommissionRatePercent:  "1.5",
+	KeyCommissionWeekCloseDay: "saturday",
+	KeyCommissionGraceDays:    "3",
 }
 
 var ErrUnknownSetting = errors.New("UNKNOWN_SETTING")
@@ -111,11 +177,11 @@ func (s *Service) All() map[string]string {
 // unrecognised value is rejected rather than stored — a typo here would silently
 // change platform behaviour.
 func (s *Service) Set(ctx context.Context, key, value string, adminID int32) error {
-	values, ok := allowed[key]
+	valid, ok := allowed[key]
 	if !ok {
 		return ErrUnknownSetting
 	}
-	if _, ok := values[value]; !ok {
+	if !valid(value) {
 		return ErrInvalidSettingValue
 	}
 
@@ -151,4 +217,35 @@ func (s *Service) QuotesOnOrders() bool {
 func (s *Service) QuotesOnPosts() bool {
 	stage := s.CarrierQuoteStage()
 	return stage == StagePost || stage == StageBoth
+}
+
+// CommissionRate is the platform's cut as a percentage (#13). Callers snapshot
+// this onto the charge they create — never read it back to recompute an old one.
+// A malformed stored value falls back to the default rather than billing zero,
+// which would silently stop collection.
+func (s *Service) CommissionRate() decimal.Decimal {
+	d, err := decimal.NewFromString(s.Get(KeyCommissionRatePercent))
+	if err != nil {
+		slog.Error("invalid commission rate stored, using default",
+			"value", s.Get(KeyCommissionRatePercent), "default", defaults[KeyCommissionRatePercent])
+		d, _ = decimal.NewFromString(defaults[KeyCommissionRatePercent])
+	}
+	return d
+}
+
+// CommissionWeekCloseDay is the weekday the weekly invoice run fires.
+func (s *Service) CommissionWeekCloseDay() time.Weekday {
+	if day, ok := weekdays[s.Get(KeyCommissionWeekCloseDay)]; ok {
+		return day
+	}
+	return time.Saturday
+}
+
+// CommissionGraceDays is how long after issue an invoice becomes overdue.
+func (s *Service) CommissionGraceDays() int {
+	n, err := strconv.Atoi(s.Get(KeyCommissionGraceDays))
+	if err != nil || n < 0 {
+		return 3
+	}
+	return n
 }

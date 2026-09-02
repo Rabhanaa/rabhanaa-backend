@@ -44,6 +44,7 @@ type Querier interface {
 	// restore a suspended post, which is why 'suspended' is accepted too.
 	ApproveSellAuction(ctx context.Context, arg ApproveSellAuctionParams) (SellAuction, error)
 	AttachCarrierToOrder(ctx context.Context, arg AttachCarrierToOrderParams) (Order, error)
+	AttachChargesToInvoice(ctx context.Context, arg AttachChargesToInvoiceParams) (int64, error)
 	BanUser(ctx context.Context, arg BanUserParams) (int64, error)
 	CancelBuyRequest(ctx context.Context, id int32) error
 	CancelOrder(ctx context.Context, id int32) error
@@ -82,12 +83,15 @@ type Querier interface {
 	CountSearchSellAuctions(ctx context.Context, arg CountSearchSellAuctionsParams) (int64, error)
 	CountSellAuctionsByOwner(ctx context.Context, ownerID int32) (int64, error)
 	CountSellBidsByAuction(ctx context.Context, auctionID int32) (int64, error)
+	CountSellerBalances(ctx context.Context, overdueOnly bool) (int64, error)
 	CountShippingQuotesByCarrier(ctx context.Context, carrierID int32) (int64, error)
 	CountSupplyOffersByRequest(ctx context.Context, buyRequestID int32) (int64, error)
 	CountUnreadNotifications(ctx context.Context, userID int32) (int64, error)
 	CountUserDocuments(ctx context.Context, userID int32) (int64, error)
 	CountUsersByStatus(ctx context.Context, status string) (int64, error)
 	CreateBuyRequest(ctx context.Context, arg CreateBuyRequestParams) (BuyRequest, error)
+	CreateCommissionCharge(ctx context.Context, arg CreateCommissionChargeParams) (CommissionCharge, error)
+	CreateCommissionInvoice(ctx context.Context, arg CreateCommissionInvoiceParams) (CommissionInvoice, error)
 	CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error)
 	CreateIssueReply(ctx context.Context, arg CreateIssueReplyParams) (IssueReply, error)
 	CreateLoginHistory(ctx context.Context, arg CreateLoginHistoryParams) error
@@ -128,11 +132,13 @@ type Querier interface {
 	GetBuyRequestByPublicID(ctx context.Context, publicID pgtype.UUID) (BuyRequest, error)
 	GetBuyRequestByPublicIDForUpdate(ctx context.Context, publicID pgtype.UUID) (BuyRequest, error)
 	GetCarrierProfile(ctx context.Context, userID int32) (CarrierProfile, error)
+	GetCommissionTotals(ctx context.Context) (GetCommissionTotalsRow, error)
 	GetExpiredActiveBuyRequests(ctx context.Context) ([]BuyRequest, error)
 	GetExpiredActiveSellAuctions(ctx context.Context) ([]SellAuction, error)
 	GetExpiredPendingSelectionBuyRequests(ctx context.Context, windowHours int32) ([]BuyRequest, error)
 	GetExpiredPendingSelectionSellAuctions(ctx context.Context, windowHours int32) ([]SellAuction, error)
 	GetInterestByID(ctx context.Context, id int32) (Interest, error)
+	GetInvoiceByPublicID(ctx context.Context, publicID pgtype.UUID) (CommissionInvoice, error)
 	GetIssueAdminDetail(ctx context.Context, publicID pgtype.UUID) (GetIssueAdminDetailRow, error)
 	GetIssueByID(ctx context.Context, id int32) (Issue, error)
 	GetIssueByPublicID(ctx context.Context, publicID pgtype.UUID) (Issue, error)
@@ -157,6 +163,8 @@ type Querier interface {
 	GetSellBidByAuctionAndBidder(ctx context.Context, arg GetSellBidByAuctionAndBidderParams) (SellBid, error)
 	GetSellBidByID(ctx context.Context, id int32) (SellBid, error)
 	GetSellBidByPublicID(ctx context.Context, publicID pgtype.UUID) (SellBid, error)
+	// Seller-facing.
+	GetSellerCommissionSummary(ctx context.Context, sellerID int32) (GetSellerCommissionSummaryRow, error)
 	GetSessionByTokenHash(ctx context.Context, tokenHash string) (UserSession, error)
 	GetShippingQuoteByPublicID(ctx context.Context, publicID pgtype.UUID) (ShippingQuote, error)
 	GetShippingQuoteByPublicIDForUpdate(ctx context.Context, publicID pgtype.UUID) (ShippingQuote, error)
@@ -212,7 +220,18 @@ type Querier interface {
 	ListBuyRequestsByOwner(ctx context.Context, arg ListBuyRequestsByOwnerParams) ([]BuyRequest, error)
 	ListCarrierRegionIDs(ctx context.Context, userID int32) ([]int32, error)
 	ListCarrierRegions(ctx context.Context, userID int32) ([]ListCarrierRegionsRow, error)
+	ListChargesByInvoice(ctx context.Context, invoiceID pgtype.Int4) ([]CommissionCharge, error)
+	ListChargesBySeller(ctx context.Context, arg ListChargesBySellerParams) ([]CommissionCharge, error)
+	// Platform commission (#13). See migration 045 for the shape and the reasoning.
+	// Accrual. Charges are derived from orders rather than written by the
+	// confirmation handler: ConfirmOrderAsSeller/AsBuyer are conditional updates
+	// declared :exec, so the service cannot tell whether the transition actually
+	// applied, and accruing there would bill orders that never completed. Running
+	// this every minute is idempotent because commission_charges.order_id is UNIQUE.
+	ListCompletedOrdersWithoutCharge(ctx context.Context, arg ListCompletedOrdersWithoutChargeParams) ([]ListCompletedOrdersWithoutChargeRow, error)
 	ListInterests(ctx context.Context) ([]Interest, error)
+	ListInvoicesBySeller(ctx context.Context, arg ListInvoicesBySellerParams) ([]CommissionInvoice, error)
+	ListInvoicesForAdmin(ctx context.Context, arg ListInvoicesForAdminParams) ([]ListInvoicesForAdminRow, error)
 	ListIssueReplies(ctx context.Context, issueID int32) ([]IssueReply, error)
 	ListIssuesByUser(ctx context.Context, arg ListIssuesByUserParams) ([]Issue, error)
 	ListJobs(ctx context.Context) ([]Job, error)
@@ -245,6 +264,10 @@ type Querier interface {
 	ListSellAuctionsByOwner(ctx context.Context, arg ListSellAuctionsByOwnerParams) ([]SellAuction, error)
 	ListSellBidsByAuction(ctx context.Context, auctionID int32) ([]ListSellBidsByAuctionRow, error)
 	ListSellBidsByBidder(ctx context.Context, arg ListSellBidsByBidderParams) ([]ListSellBidsByBidderRow, error)
+	// Admin. The worklist is one row per seller who owes something, overdue first.
+	ListSellerBalances(ctx context.Context, arg ListSellerBalancesParams) ([]ListSellerBalancesRow, error)
+	// Invoicing.
+	ListSellersWithUninvoicedCharges(ctx context.Context, arg ListSellersWithUninvoicedChargesParams) ([]ListSellersWithUninvoicedChargesRow, error)
 	// The carrier's own list, so their own prices are theirs to see. The job's title
 	// comes from whichever target the quote points at.
 	ListShippingQuotesByCarrier(ctx context.Context, arg ListShippingQuotesByCarrierParams) ([]ListShippingQuotesByCarrierRow, error)
@@ -259,6 +282,10 @@ type Querier interface {
 	MarkBuyRequestMotivated(ctx context.Context, id int32) error
 	MarkBuyRequestNotified(ctx context.Context, id int32) error
 	MarkBuyRequestSelectionWarned(ctx context.Context, id int32) error
+	// Recording a payment is admin-only and one-way: an invoice is unpaid, paid or
+	// waived. The status guard makes a double-submit a no-op rather than a second
+	// payment record.
+	MarkInvoicePaid(ctx context.Context, arg MarkInvoicePaidParams) (int64, error)
 	MarkNotChosenSellBids(ctx context.Context, auctionID int32) error
 	MarkNotChosenSupplyOffers(ctx context.Context, buyRequestID int32) error
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
@@ -321,6 +348,7 @@ type Querier interface {
 	// one profile row, so there is nothing to distinguish create from update.
 	UpsertCarrierProfile(ctx context.Context, arg UpsertCarrierProfileParams) (CarrierProfile, error)
 	UpsertDeviceToken(ctx context.Context, arg UpsertDeviceTokenParams) error
+	WaiveInvoice(ctx context.Context, arg WaiveInvoiceParams) (int64, error)
 	// Only a quote nobody has answered yet: withdrawing an accepted one would strip
 	// a carrier off a deal the merchant has already committed to.
 	WithdrawShippingQuote(ctx context.Context, id int32) (ShippingQuote, error)

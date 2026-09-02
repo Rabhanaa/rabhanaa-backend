@@ -14,6 +14,7 @@ import (
 	authCtxPkg "rabhana/auth/context"
 	authRepoPkg "rabhana/auth/repository"
 	authSvcPkg "rabhana/auth/service"
+	commissionSvcPkg "rabhana/commission/service"
 	"rabhana/db/sqlc"
 	"rabhana/lib/email"
 	"rabhana/lib/firebase"
@@ -51,6 +52,7 @@ type AppContext struct {
 	ModerationService        *auctionSvcPkg.ModerationService
 	SettingsService          *settingsSvcPkg.Service
 	ShippingService          *shippingSvcPkg.Service
+	CommissionService        *commissionSvcPkg.Service
 
 	// Repositories (for handlers that need direct access)
 	SellBidRepo     auctionRepoPkg.SellBidRepository
@@ -118,6 +120,13 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 
 	// Carrier accounts and shipping quotes (#14).
 	shippingService := shippingSvcPkg.NewService(queries, settingsService, notificationService)
+
+	// Platform commission (#13). Takes the pool because issuing an invoice and
+	// attaching its charges must be one transaction, and the seeder's address so
+	// synthetic sales are never billed.
+	commissionService := commissionSvcPkg.NewService(
+		queries, dbClient.Pool, settingsService, notificationService, auctionSvcPkg.SeedUserEmail,
+	)
 
 	// Subscription admin service
 	subscriptionAdminSvc := subscriptionSvcPkg.NewAdminService(queries, authRepository)
@@ -222,6 +231,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		notificationService,
 		seedService,
 		queries,
+		commissionService,
 		cfg.SelectionWindowHours,
 		cfg.RegionFilterEnabled,
 	)
@@ -248,6 +258,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		ModerationService:        moderationService,
 		SettingsService:          settingsService,
 		ShippingService:          shippingService,
+		CommissionService:        commissionService,
 		SellBidRepo:              sellBidRepo,
 		SupplyOfferRepo:          supplyOfferRepo,
 	}, nil

@@ -79,6 +79,14 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	protected.POST("/auth/change-password", authHandler.ChangePassword)
 	protected.POST("/auth/location", authHandler.UpdateLocation)
 
+	// Platform commission (#13). Seller-scoped: both read the caller's own id
+	// from the token, so there is no way to ask for another seller's balance.
+	// NotCarrier because a carrier moves goods rather than selling them and can
+	// never accrue a charge.
+	commissionHandler := NewCommissionHandler(ctx.CommissionService)
+	protected.GET("/commissions/summary", middleware.NotCarrier(), commissionHandler.Summary)
+	protected.GET("/commissions/charges", middleware.NotCarrier(), commissionHandler.ListMyCharges)
+
 	// Auction routes
 	sellHandler := NewSellAuctionHandler(ctx.SellAuctionService)
 	protected.POST("/sell-auctions", middleware.NotCarrier(), sellHandler.Create)
@@ -210,6 +218,14 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	adminGroup.POST("/posts/:id/reject", moderationHandler.Reject)
 	adminGroup.POST("/posts/:id/suspend", moderationHandler.Suspend)
 	adminGroup.POST("/posts/:id/unsuspend", moderationHandler.Unsuspend)
+
+	// Commission collection (#13). Blocking a non-payer is not here on purpose:
+	// it reuses the existing suspension routes above, so there is one way to
+	// disable an account and one place its reason is recorded.
+	adminGroup.GET("/commissions", commissionHandler.AdminList)
+	adminGroup.GET("/commissions/sellers/:id", commissionHandler.AdminSellerDetail)
+	adminGroup.POST("/commissions/invoices/:id/pay", commissionHandler.AdminMarkPaid)
+	adminGroup.POST("/commissions/invoices/:id/waive", commissionHandler.AdminWaive)
 
 	settingsHandler := NewAdminSettingsHandler(ctx.SettingsService)
 	adminGroup.GET("/settings", settingsHandler.List)
