@@ -130,3 +130,26 @@ WHERE id = $1 AND status = 'unpaid';
 UPDATE commission_invoices
 SET status = 'waived', waived_reason = $2, recorded_by_admin_id = $3, updated_at = NOW()
 WHERE id = $1 AND status = 'unpaid';
+
+-- Payment reminders. Candidates are unpaid invoices that are due and either
+-- never reminded or last reminded longer ago than the configured interval. The
+-- interval is a parameter rather than a literal so the admin setting is the only
+-- place the cadence is defined.
+-- name: ListInvoicesNeedingReminder :many
+SELECT i.*, u.name AS seller_name
+FROM commission_invoices i
+JOIN users u ON u.id = i.seller_id
+WHERE i.status = 'unpaid'
+  AND i.due_at <= NOW()
+  -- The cutoff is computed by the caller from the configured cadence: doing the
+  -- interval arithmetic here would put the same rule in two places.
+  AND (i.last_reminder_at IS NULL OR i.last_reminder_at < @remind_before::timestamptz)
+ORDER BY i.due_at
+LIMIT $1;
+
+-- name: MarkInvoiceReminded :exec
+UPDATE commission_invoices
+SET last_reminder_at = NOW(),
+    reminder_count   = reminder_count + 1,
+    updated_at       = NOW()
+WHERE id = $1;

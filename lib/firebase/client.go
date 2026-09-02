@@ -101,7 +101,7 @@ func (c *Client) buildLink(data map[string]string) string {
 		}
 	// Platform commission (#13). The invoice lives on the seller's own screen;
 	// there is nothing order-specific to open.
-	case "commission_invoice_issued":
+	case "commission_invoice_issued", "commission_payment_reminder":
 		return c.baseURL + "/commissions"
 	case "new_order", "order_confirmed":
 		if id := data["order_id"]; id != "" {

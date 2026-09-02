@@ -32,6 +32,10 @@ func (s *NotificationService) SendToUser(ctx context.Context, userID int32, titl
 	switch data["type"] {
 	case "account_suspended", "account_banned", "account_unsuspended", "account_unbanned":
 		// System status notifications bypass the suspension/ban gate
+	case "commission_payment_reminder":
+		// Also bypasses it, deliberately. A seller suspended for not paying is
+		// exactly who needs the reminder — paying is what gets them unblocked,
+		// and silencing it would leave them with no way to find that out.
 	default:
 		user, err := s.queries.GetUserStatusByID(ctx, userID)
 		if err != nil {

@@ -33,12 +33,19 @@ import (
 // database for an unbounded time after a long outage.
 const accrualBatchSize = 500
 
+// One sweep's worth of reminders. Same reasoning as the accrual cap.
+const reminderBatchSize = 200
+
 // Invoices are dated in Cairo time — the server runs UTC, and "which week did
 // this sale fall in" has to match what the client would say.
 const billingTimezone = "Africa/Cairo"
 
 type NotificationSender interface {
 	Send(ctx context.Context, userID int32, event notifModel.EventType, data map[string]string)
+	// SendToUser carries an explicit title and body. Reminders use it so the
+	// seller sees the amount and how late it is, rather than a fixed sentence
+	// that makes every reminder look identical to the last one.
+	SendToUser(ctx context.Context, userID int32, title, body string, data map[string]string)
 }
 
 type Service struct {
@@ -487,4 +494,83 @@ func (s *Service) GetSellerDetail(ctx context.Context, sellerPublicID uuid.UUID)
 		out.Charges = append(out.Charges, toCharge(r))
 	}
 	return out, nil
+}
+
+// ---------------------------------------------------------------- reminders
+
+// SendPaymentReminders notifies sellers whose invoices are due and unpaid, and
+// keeps doing so on the configured cadence until they pay or the invoice is
+// waived.
+//
+// The cadence lives in last_reminder_at rather than in the schedule: the cron
+// ticks every minute, so "remind when overdue" without a record of the last
+// reminder would notify sixty times an hour.
+func (s *Service) SendPaymentReminders(ctx context.Context, now time.Time) (int, error) {
+	cutoff := now.AddDate(0, 0, -s.settings.CommissionReminderDays())
+
+	invoices, err := s.queries.ListInvoicesNeedingReminder(ctx, sqlc.ListInvoicesNeedingReminderParams{
+		Limit:        reminderBatchSize,
+		RemindBefore: pgtype.Timestamptz{Time: cutoff, Valid: true},
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to list invoices needing reminder: %w", err)
+	}
+
+	sent := 0
+	for _, inv := range invoices {
+		if err := s.remind(ctx, inv.ID, inv.SellerID, inv.PublicID, inv.TotalAmount, inv.DueAt.Time, now); err != nil {
+			slog.Error("failed to send commission reminder", "invoice_id", inv.ID, "error", err)
+			continue
+		}
+		sent++
+	}
+
+	if sent > 0 {
+		slog.Info("commission payment reminders sent", "count", sent)
+	}
+	return sent, nil
+}
+
+// RemindNow is the admin's manual nudge from the collection list. It ignores the
+// cadence — an admin working the list has a reason — but still stamps
+// last_reminder_at, so a manual reminder pushes the automatic one out rather
+// than arriving alongside it.
+func (s *Service) RemindNow(ctx context.Context, invoicePublicID uuid.UUID) error {
+	invoice, err := s.queries.GetInvoiceByPublicID(ctx, pgtype.UUID{Bytes: invoicePublicID, Valid: true})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return errs.ErrInvoiceNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("failed to load invoice: %w", err)
+	}
+	if invoice.Status != "unpaid" {
+		return errs.ErrInvoiceNotPayable
+	}
+	return s.remind(ctx, invoice.ID, invoice.SellerID, invoice.PublicID, invoice.TotalAmount, invoice.DueAt.Time, time.Now())
+}
+
+func (s *Service) remind(ctx context.Context, invoiceID, sellerID int32, publicID pgtype.UUID, total pgtype.Numeric, dueAt, now time.Time) error {
+	amount := numericString(total)
+	daysLate := int(now.Sub(dueAt).Hours() / 24)
+
+	body := fmt.Sprintf("لديك عمولة مستحقة بقيمة %s ج.م", amount)
+	if daysLate > 0 {
+		body = fmt.Sprintf("%s — متأخرة %d يوم. يرجى التواصل مع الإدارة للسداد", body, daysLate)
+	} else {
+		body += " — تستحق السداد اليوم. يرجى التواصل مع الإدارة"
+	}
+
+	s.notifier.SendToUser(ctx, sellerID, "تذكير بسداد العمولة", body, map[string]string{
+		"type":       string(notifModel.EventCommissionPaymentReminder),
+		"invoice_id": publicID.String(),
+		"amount":     amount,
+	})
+
+	if err := s.queries.MarkInvoiceReminded(ctx, invoiceID); err != nil {
+		// The notification is already out. Failing to stamp it means the next
+		// sweep sends another, which is why this is an error worth surfacing
+		// rather than ignoring.
+		return fmt.Errorf("failed to record reminder: %w", err)
+	}
+	return nil
 }

@@ -89,6 +89,8 @@ type CommissionInvoice struct {
 	RecordedByAdminID pgtype.Int4        `json:"recorded_by_admin_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	LastReminderAt    pgtype.Timestamptz `json:"last_reminder_at"`
+	ReminderCount     int32              `json:"reminder_count"`
 }
 
 type DeviceToken struct {

@@ -226,6 +226,7 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	adminGroup.GET("/commissions/sellers/:id", commissionHandler.AdminSellerDetail)
 	adminGroup.POST("/commissions/invoices/:id/pay", commissionHandler.AdminMarkPaid)
 	adminGroup.POST("/commissions/invoices/:id/waive", commissionHandler.AdminWaive)
+	adminGroup.POST("/commissions/invoices/:id/remind", commissionHandler.AdminRemind)
 
 	settingsHandler := NewAdminSettingsHandler(ctx.SettingsService)
 	adminGroup.GET("/settings", settingsHandler.List)

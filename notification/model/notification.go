@@ -38,6 +38,10 @@ const (
 	// Platform commission (#13). Issued weekly; the seller settles it with the
 	// admin off-platform.
 	EventCommissionInvoiceIssued EventType = "commission_invoice_issued"
+	// Repeats while an invoice stays unpaid past its due date. The body is built
+	// per invoice so the seller sees the amount, so this event's entry in
+	// NotificationMessages is only a fallback.
+	EventCommissionPaymentReminder EventType = "commission_payment_reminder"
 )
 
 var NotificationMessages = map[EventType]struct{ Title, Body string }{
@@ -68,8 +72,9 @@ var NotificationMessages = map[EventType]struct{ Title, Body string }{
 	EventPostSuspended: {"تم إيقاف منشورك", "تم إيقاف المنشور مؤقتاً"},
 	// The merchant is told a price arrived, not what it is: they open the deal to
 	// compare it against the others, and a push notification is not private.
-	EventShippingQuoteReceived:   {"عرض شحن جديد", "وصلك عرض لشحن صفقتك"},
-	EventShippingQuoteAccepted:   {"تم قبول عرض الشحن", "وافق التاجر على عرضك — تفاصيل التواصل متاحة الآن"},
-	EventCommissionInvoiceIssued: {"عمولة المنصة", "صدرت فاتورة عمولة الأسبوع — يمكنك مراجعتها من حسابك"},
-	EventShippingQuoteRejected:   {"لم يتم اختيار عرضك", "تم اختيار شركة شحن أخرى لهذه الصفقة"},
+	EventShippingQuoteReceived:     {"عرض شحن جديد", "وصلك عرض لشحن صفقتك"},
+	EventShippingQuoteAccepted:     {"تم قبول عرض الشحن", "وافق التاجر على عرضك — تفاصيل التواصل متاحة الآن"},
+	EventCommissionInvoiceIssued:   {"عمولة المنصة", "صدرت فاتورة عمولة الأسبوع — يمكنك مراجعتها من حسابك"},
+	EventCommissionPaymentReminder: {"تذكير بسداد العمولة", "لديك فاتورة عمولة مستحقة — يرجى التواصل مع الإدارة للسداد"},
+	EventShippingQuoteRejected:     {"لم يتم اختيار عرضك", "تم اختيار شركة شحن أخرى لهذه الصفقة"},
 }

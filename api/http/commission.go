@@ -89,6 +89,22 @@ func (h *CommissionHandler) AdminMarkPaid(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "تم تسجيل الدفعة"})
 }
 
+// AdminRemind is the manual nudge from the collection list, for when an admin is
+// working through it and wants to prompt one seller now.
+func (h *CommissionHandler) AdminRemind(c *gin.Context) {
+	invoiceID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid invoice id"})
+		return
+	}
+
+	if err := h.commissionService.RemindNow(c.Request.Context(), invoiceID); err != nil {
+		handleError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "تم إرسال التذكير"})
+}
+
 // AdminWaive writes an invoice off. The reason is required: this is the only way
 // to cancel a debt, and an unexplained write-off is indistinguishable from a
 // mistake when someone reviews the ledger later.

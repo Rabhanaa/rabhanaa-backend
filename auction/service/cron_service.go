@@ -123,6 +123,9 @@ func (c *CronService) processCommissions(ctx context.Context) {
 	if _, err := c.commission.IssueWeeklyInvoices(ctx, time.Now()); err != nil {
 		slog.Error("failed to issue commission invoices", "error", err)
 	}
+	if _, err := c.commission.SendPaymentReminders(ctx, time.Now()); err != nil {
+		slog.Error("failed to send commission reminders", "error", err)
+	}
 }
 
 func (c *CronService) seedAuctions(ctx context.Context) {
@@ -430,4 +433,5 @@ func (c *CronService) ownerIsSupplySide(ctx context.Context, ownerID int32) bool
 type CommissionProcessor interface {
 	AccrueCharges(ctx context.Context) (int, error)
 	IssueWeeklyInvoices(ctx context.Context, now time.Time) (int, error)
+	SendPaymentReminders(ctx context.Context, now time.Time) (int, error)
 }

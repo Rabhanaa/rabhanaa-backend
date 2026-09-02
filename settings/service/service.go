@@ -37,6 +37,10 @@ const (
 	// KeyCommissionGraceDays is how long a seller has to pay before the admin
 	// worklist flags them. Stored onto each invoice as due_at at issue time.
 	KeyCommissionGraceDays = "commission_grace_days"
+	// KeyCommissionReminderDays is how often an unpaid invoice re-notifies the
+	// seller once it is due. Read at send time, so changing it takes effect on
+	// the next sweep.
+	KeyCommissionReminderDays = "commission_reminder_days"
 )
 
 // Values for KeyCarrierQuoteStage.
@@ -108,6 +112,8 @@ var allowed = map[string]validator{
 	KeyCommissionRatePercent:  decimalRange(0, 100),
 	KeyCommissionWeekCloseDay: oneOf(CommissionWeekDays...),
 	KeyCommissionGraceDays:    intRange(0, 90),
+	// At least one day: a smaller value would notify on every cron tick.
+	KeyCommissionReminderDays: intRange(1, 30),
 }
 
 var defaults = map[string]string{
@@ -115,6 +121,7 @@ var defaults = map[string]string{
 	KeyCommissionRatePercent:  "1.5",
 	KeyCommissionWeekCloseDay: "saturday",
 	KeyCommissionGraceDays:    "3",
+	KeyCommissionReminderDays: "2",
 }
 
 var ErrUnknownSetting = errors.New("UNKNOWN_SETTING")
@@ -239,6 +246,17 @@ func (s *Service) CommissionWeekCloseDay() time.Weekday {
 		return day
 	}
 	return time.Saturday
+}
+
+// CommissionReminderDays is the gap between repeat reminders on an unpaid
+// invoice. Floored at one day so a misconfiguration cannot turn the every-minute
+// cron into a notification flood.
+func (s *Service) CommissionReminderDays() int {
+	n, err := strconv.Atoi(s.Get(KeyCommissionReminderDays))
+	if err != nil || n < 1 {
+		return 2
+	}
+	return n
 }
 
 // CommissionGraceDays is how long after issue an invoice becomes overdue.

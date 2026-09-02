@@ -100,7 +100,7 @@ INSERT INTO commission_invoices (
     seller_id, period_start, period_end, total_amount, due_at
 ) VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (seller_id, period_start) DO NOTHING
-RETURNING id, public_id, seller_id, period_start, period_end, total_amount, status, issued_at, due_at, paid_at, payment_method, payment_reference, payment_note, waived_reason, recorded_by_admin_id, created_at, updated_at
+RETURNING id, public_id, seller_id, period_start, period_end, total_amount, status, issued_at, due_at, paid_at, payment_method, payment_reference, payment_note, waived_reason, recorded_by_admin_id, created_at, updated_at, last_reminder_at, reminder_count
 `
 
 type CreateCommissionInvoiceParams struct {
@@ -138,6 +138,8 @@ func (q *Queries) CreateCommissionInvoice(ctx context.Context, arg CreateCommiss
 		&i.RecordedByAdminID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastReminderAt,
+		&i.ReminderCount,
 	)
 	return i, err
 }
@@ -164,7 +166,7 @@ func (q *Queries) GetCommissionTotals(ctx context.Context) (GetCommissionTotalsR
 }
 
 const getInvoiceByPublicID = `-- name: GetInvoiceByPublicID :one
-SELECT id, public_id, seller_id, period_start, period_end, total_amount, status, issued_at, due_at, paid_at, payment_method, payment_reference, payment_note, waived_reason, recorded_by_admin_id, created_at, updated_at FROM commission_invoices WHERE public_id = $1
+SELECT id, public_id, seller_id, period_start, period_end, total_amount, status, issued_at, due_at, paid_at, payment_method, payment_reference, payment_note, waived_reason, recorded_by_admin_id, created_at, updated_at, last_reminder_at, reminder_count FROM commission_invoices WHERE public_id = $1
 `
 
 func (q *Queries) GetInvoiceByPublicID(ctx context.Context, publicID pgtype.UUID) (CommissionInvoice, error) {
@@ -188,6 +190,8 @@ func (q *Queries) GetInvoiceByPublicID(ctx context.Context, publicID pgtype.UUID
 		&i.RecordedByAdminID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastReminderAt,
+		&i.ReminderCount,
 	)
 	return i, err
 }
@@ -359,7 +363,7 @@ func (q *Queries) ListCompletedOrdersWithoutCharge(ctx context.Context, arg List
 }
 
 const listInvoicesBySeller = `-- name: ListInvoicesBySeller :many
-SELECT id, public_id, seller_id, period_start, period_end, total_amount, status, issued_at, due_at, paid_at, payment_method, payment_reference, payment_note, waived_reason, recorded_by_admin_id, created_at, updated_at FROM commission_invoices
+SELECT id, public_id, seller_id, period_start, period_end, total_amount, status, issued_at, due_at, paid_at, payment_method, payment_reference, payment_note, waived_reason, recorded_by_admin_id, created_at, updated_at, last_reminder_at, reminder_count FROM commission_invoices
 WHERE seller_id = $1
 ORDER BY period_start DESC
 LIMIT $2 OFFSET $3
@@ -398,6 +402,8 @@ func (q *Queries) ListInvoicesBySeller(ctx context.Context, arg ListInvoicesBySe
 			&i.RecordedByAdminID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastReminderAt,
+			&i.ReminderCount,
 		); err != nil {
 			return nil, err
 		}
@@ -410,7 +416,7 @@ func (q *Queries) ListInvoicesBySeller(ctx context.Context, arg ListInvoicesBySe
 }
 
 const listInvoicesForAdmin = `-- name: ListInvoicesForAdmin :many
-SELECT i.id, i.public_id, i.seller_id, i.period_start, i.period_end, i.total_amount, i.status, i.issued_at, i.due_at, i.paid_at, i.payment_method, i.payment_reference, i.payment_note, i.waived_reason, i.recorded_by_admin_id, i.created_at, i.updated_at, u.name AS seller_name, u.phone AS seller_phone, u.public_id AS seller_public_id
+SELECT i.id, i.public_id, i.seller_id, i.period_start, i.period_end, i.total_amount, i.status, i.issued_at, i.due_at, i.paid_at, i.payment_method, i.payment_reference, i.payment_note, i.waived_reason, i.recorded_by_admin_id, i.created_at, i.updated_at, i.last_reminder_at, i.reminder_count, u.name AS seller_name, u.phone AS seller_phone, u.public_id AS seller_public_id
 FROM commission_invoices i
 JOIN users u ON u.id = i.seller_id
 WHERE ($3::text = '' OR i.status = $3::text)
@@ -442,6 +448,8 @@ type ListInvoicesForAdminRow struct {
 	RecordedByAdminID pgtype.Int4        `json:"recorded_by_admin_id"`
 	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	LastReminderAt    pgtype.Timestamptz `json:"last_reminder_at"`
+	ReminderCount     int32              `json:"reminder_count"`
 	SellerName        string             `json:"seller_name"`
 	SellerPhone       pgtype.Text        `json:"seller_phone"`
 	SellerPublicID    pgtype.UUID        `json:"seller_public_id"`
@@ -474,9 +482,97 @@ func (q *Queries) ListInvoicesForAdmin(ctx context.Context, arg ListInvoicesForA
 			&i.RecordedByAdminID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.LastReminderAt,
+			&i.ReminderCount,
 			&i.SellerName,
 			&i.SellerPhone,
 			&i.SellerPublicID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInvoicesNeedingReminder = `-- name: ListInvoicesNeedingReminder :many
+SELECT i.id, i.public_id, i.seller_id, i.period_start, i.period_end, i.total_amount, i.status, i.issued_at, i.due_at, i.paid_at, i.payment_method, i.payment_reference, i.payment_note, i.waived_reason, i.recorded_by_admin_id, i.created_at, i.updated_at, i.last_reminder_at, i.reminder_count, u.name AS seller_name
+FROM commission_invoices i
+JOIN users u ON u.id = i.seller_id
+WHERE i.status = 'unpaid'
+  AND i.due_at <= NOW()
+  -- The cutoff is computed by the caller from the configured cadence: doing the
+  -- interval arithmetic here would put the same rule in two places.
+  AND (i.last_reminder_at IS NULL OR i.last_reminder_at < $2::timestamptz)
+ORDER BY i.due_at
+LIMIT $1
+`
+
+type ListInvoicesNeedingReminderParams struct {
+	Limit        int32              `json:"limit"`
+	RemindBefore pgtype.Timestamptz `json:"remind_before"`
+}
+
+type ListInvoicesNeedingReminderRow struct {
+	ID                int32              `json:"id"`
+	PublicID          pgtype.UUID        `json:"public_id"`
+	SellerID          int32              `json:"seller_id"`
+	PeriodStart       pgtype.Timestamptz `json:"period_start"`
+	PeriodEnd         pgtype.Timestamptz `json:"period_end"`
+	TotalAmount       pgtype.Numeric     `json:"total_amount"`
+	Status            string             `json:"status"`
+	IssuedAt          pgtype.Timestamptz `json:"issued_at"`
+	DueAt             pgtype.Timestamptz `json:"due_at"`
+	PaidAt            pgtype.Timestamptz `json:"paid_at"`
+	PaymentMethod     pgtype.Text        `json:"payment_method"`
+	PaymentReference  pgtype.Text        `json:"payment_reference"`
+	PaymentNote       pgtype.Text        `json:"payment_note"`
+	WaivedReason      pgtype.Text        `json:"waived_reason"`
+	RecordedByAdminID pgtype.Int4        `json:"recorded_by_admin_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	LastReminderAt    pgtype.Timestamptz `json:"last_reminder_at"`
+	ReminderCount     int32              `json:"reminder_count"`
+	SellerName        string             `json:"seller_name"`
+}
+
+// Payment reminders. Candidates are unpaid invoices that are due and either
+// never reminded or last reminded longer ago than the configured interval. The
+// interval is a parameter rather than a literal so the admin setting is the only
+// place the cadence is defined.
+func (q *Queries) ListInvoicesNeedingReminder(ctx context.Context, arg ListInvoicesNeedingReminderParams) ([]ListInvoicesNeedingReminderRow, error) {
+	rows, err := q.db.Query(ctx, listInvoicesNeedingReminder, arg.Limit, arg.RemindBefore)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListInvoicesNeedingReminderRow
+	for rows.Next() {
+		var i ListInvoicesNeedingReminderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.PublicID,
+			&i.SellerID,
+			&i.PeriodStart,
+			&i.PeriodEnd,
+			&i.TotalAmount,
+			&i.Status,
+			&i.IssuedAt,
+			&i.DueAt,
+			&i.PaidAt,
+			&i.PaymentMethod,
+			&i.PaymentReference,
+			&i.PaymentNote,
+			&i.WaivedReason,
+			&i.RecordedByAdminID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.LastReminderAt,
+			&i.ReminderCount,
+			&i.SellerName,
 		); err != nil {
 			return nil, err
 		}
@@ -627,6 +723,19 @@ func (q *Queries) MarkInvoicePaid(ctx context.Context, arg MarkInvoicePaidParams
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const markInvoiceReminded = `-- name: MarkInvoiceReminded :exec
+UPDATE commission_invoices
+SET last_reminder_at = NOW(),
+    reminder_count   = reminder_count + 1,
+    updated_at       = NOW()
+WHERE id = $1
+`
+
+func (q *Queries) MarkInvoiceReminded(ctx context.Context, id int32) error {
+	_, err := q.db.Exec(ctx, markInvoiceReminded, id)
+	return err
 }
 
 const waiveInvoice = `-- name: WaiveInvoice :execrows

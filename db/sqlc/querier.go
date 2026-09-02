@@ -232,6 +232,11 @@ type Querier interface {
 	ListInterests(ctx context.Context) ([]Interest, error)
 	ListInvoicesBySeller(ctx context.Context, arg ListInvoicesBySellerParams) ([]CommissionInvoice, error)
 	ListInvoicesForAdmin(ctx context.Context, arg ListInvoicesForAdminParams) ([]ListInvoicesForAdminRow, error)
+	// Payment reminders. Candidates are unpaid invoices that are due and either
+	// never reminded or last reminded longer ago than the configured interval. The
+	// interval is a parameter rather than a literal so the admin setting is the only
+	// place the cadence is defined.
+	ListInvoicesNeedingReminder(ctx context.Context, arg ListInvoicesNeedingReminderParams) ([]ListInvoicesNeedingReminderRow, error)
 	ListIssueReplies(ctx context.Context, issueID int32) ([]IssueReply, error)
 	ListIssuesByUser(ctx context.Context, arg ListIssuesByUserParams) ([]Issue, error)
 	ListJobs(ctx context.Context) ([]Job, error)
@@ -286,6 +291,7 @@ type Querier interface {
 	// waived. The status guard makes a double-submit a no-op rather than a second
 	// payment record.
 	MarkInvoicePaid(ctx context.Context, arg MarkInvoicePaidParams) (int64, error)
+	MarkInvoiceReminded(ctx context.Context, id int32) error
 	MarkNotChosenSellBids(ctx context.Context, auctionID int32) error
 	MarkNotChosenSupplyOffers(ctx context.Context, buyRequestID int32) error
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
