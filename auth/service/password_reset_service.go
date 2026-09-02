@@ -34,7 +34,7 @@ const (
 func (s *AuthService) RequestPasswordReset(ctx context.Context, rawEmail string) {
 	address := strings.ToLower(strings.TrimSpace(rawEmail))
 
-	user, err := s.repo.GetUserByEmail(ctx, address)
+	user, err := s.repo.GetUserByEmail(ctx, NormalizeEmail(address))
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			slog.Error("password reset: lookup failed", "error", err)
@@ -170,7 +170,7 @@ func (s *AuthService) ResetPassword(ctx context.Context, rawEmail, code, newPass
 func (s *AuthService) checkResetCode(ctx context.Context, rawEmail, code string) (sqlc.User, sqlc.PasswordResetCode, error) {
 	address := strings.ToLower(strings.TrimSpace(rawEmail))
 
-	user, err := s.repo.GetUserByEmail(ctx, address)
+	user, err := s.repo.GetUserByEmail(ctx, NormalizeEmail(address))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Same error as a wrong code: at this point the caller already

@@ -73,3 +73,18 @@ func HashPassword(password string) (string, error) {
 func CheckPassword(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
+
+// NormalizeEmail lowercases and trims an address before it is stored or looked
+// up.
+//
+// Email domains are case-insensitive and no mail provider in practice treats the
+// local part as case-sensitive, but the users.email unique index is. Without
+// this, registering "X@Gmail.com" when "x@gmail.com" exists passes the
+// duplicate check and then dies on the index — surfacing as an unexplained
+// "unexpected error" rather than "this address is taken". Worse, an account
+// stored with capitals can never log in with the address its owner types, and
+// its password reset silently does nothing, because that endpoint reports
+// success whether or not the address was found.
+func NormalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}

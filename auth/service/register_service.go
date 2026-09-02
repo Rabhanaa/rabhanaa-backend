@@ -29,7 +29,11 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 		return nil, errs.ErrInvalidSignupSource
 	}
 
-	_, err := s.repo.GetUserByEmail(ctx, req.Email)
+	// Normalised once here and used for both the duplicate check and the insert,
+	// so the two can never disagree about what counts as the same address.
+	email := NormalizeEmail(req.Email)
+
+	_, err := s.repo.GetUserByEmail(ctx, email)
 	if err == nil {
 		return nil, errs.ErrEmailAlreadyExists
 	}
@@ -79,7 +83,7 @@ func (s *AuthService) RegisterUser(ctx context.Context, req model.RegisterReques
 	}
 
 	user, err := s.repo.CreateUser(ctx, sqlc.CreateUserParams{
-		Email:            req.Email,
+		Email:            email,
 		Phone:            pgtype.Text{String: req.Phone, Valid: true},
 		PasswordHash:     pgtype.Text{String: passwordHash, Valid: true},
 		Name:             req.Name,

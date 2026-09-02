@@ -18,7 +18,7 @@ import (
 )
 
 func (s *AuthService) Login(ctx context.Context, req model.LoginRequest, deviceInfo, ipAddress string) (*model.AuthResponse, error) {
-	user, err := s.repo.GetUserByEmail(ctx, req.Email)
+	user, err := s.repo.GetUserByEmail(ctx, NormalizeEmail(req.Email))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, errs.ErrInvalidCredentials
