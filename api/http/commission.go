@@ -144,3 +144,26 @@ func (h *CommissionHandler) AdminSellerDetail(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, detail)
 }
+
+// AdminInvoiceHistory is the settled ledger: what has been collected or written
+// off, rather than what is still owed.
+//
+// ?status=settled (default) covers paid and waived together; "" returns every
+// invoice including the unpaid ones, for reconciling a period end to end.
+func (h *CommissionHandler) AdminInvoiceHistory(c *gin.Context) {
+	page, pageSize := paginationParams(c)
+	offset := (page - 1) * pageSize
+
+	status := c.DefaultQuery("status", "settled")
+	if status == "all" {
+		status = ""
+	}
+
+	history, err := h.commissionService.ListInvoiceHistory(c.Request.Context(), status, pageSize, offset)
+	if err != nil {
+		handleError(c, err)
+		return
+	}
+	history.Page = page
+	c.JSON(http.StatusOK, history)
+}

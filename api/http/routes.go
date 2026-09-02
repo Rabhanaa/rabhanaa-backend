@@ -224,6 +224,7 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	// disable an account and one place its reason is recorded.
 	adminGroup.GET("/commissions", commissionHandler.AdminList)
 	adminGroup.GET("/commissions/sellers/:id", commissionHandler.AdminSellerDetail)
+	adminGroup.GET("/commissions/history", commissionHandler.AdminInvoiceHistory)
 	adminGroup.POST("/commissions/invoices/:id/pay", commissionHandler.AdminMarkPaid)
 	adminGroup.POST("/commissions/invoices/:id/waive", commissionHandler.AdminWaive)
 	adminGroup.POST("/commissions/invoices/:id/remind", commissionHandler.AdminRemind)

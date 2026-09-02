@@ -109,13 +109,34 @@ FROM commission_invoices;
 -- name: GetInvoiceByPublicID :one
 SELECT * FROM commission_invoices WHERE public_id = $1;
 
+-- The settled ledger. The balances list above is a worklist and shows only what
+-- is still owed, so without this an invoice disappears the moment it is paid and
+-- there is no record of what was collected, from whom, or by which admin.
+--
+-- 'settled' groups paid and waived: both are closed, and an admin looking back
+-- at a week wants them side by side rather than in two tabs.
 -- name: ListInvoicesForAdmin :many
-SELECT i.*, u.name AS seller_name, u.phone AS seller_phone, u.public_id AS seller_public_id
+SELECT i.*,
+       u.name       AS seller_name,
+       u.phone      AS seller_phone,
+       u.public_id  AS seller_public_id,
+       a.name       AS recorded_by_name
 FROM commission_invoices i
 JOIN users u ON u.id = i.seller_id
-WHERE (@status_filter::text = '' OR i.status = @status_filter::text)
-ORDER BY i.issued_at DESC
+LEFT JOIN users a ON a.id = i.recorded_by_admin_id
+WHERE (@status_filter::text = ''
+       OR (@status_filter::text = 'settled' AND i.status IN ('paid', 'waived'))
+       OR i.status = @status_filter::text)
+-- Ordered by when it was closed, not when it was issued: this is a record of
+-- collection activity, and paid_at is null only for waived rows.
+ORDER BY COALESCE(i.paid_at, i.updated_at) DESC
 LIMIT $1 OFFSET $2;
+
+-- name: CountInvoicesForAdmin :one
+SELECT COUNT(*) FROM commission_invoices i
+WHERE (@status_filter::text = ''
+       OR (@status_filter::text = 'settled' AND i.status IN ('paid', 'waived'))
+       OR i.status = @status_filter::text);
 
 -- Recording a payment is admin-only and one-way: an invoice is unpaid, paid or
 -- waived. The status guard makes a double-submit a no-op rather than a second

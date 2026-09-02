@@ -574,3 +574,69 @@ func (s *Service) remind(ctx context.Context, invoiceID, sellerID int32, publicI
 	}
 	return nil
 }
+
+// ListInvoiceHistory is the settled ledger behind the collection worklist.
+//
+// ListBalances answers "who owes me money" and by design drops an invoice the
+// moment it is paid. This answers "what was collected, from whom, and by which
+// admin" — the question that only gets asked after the fact, when the totals are
+// being checked or a seller says they already paid.
+//
+// statusFilter: "settled" for paid and waived together, "" for everything, or a
+// single status.
+func (s *Service) ListInvoiceHistory(ctx context.Context, statusFilter string, limit, offset int32) (*commissionModel.AdminInvoicesResponse, error) {
+	rows, err := s.queries.ListInvoicesForAdmin(ctx, sqlc.ListInvoicesForAdminParams{
+		StatusFilter: statusFilter,
+		Limit:        limit,
+		Offset:       offset,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list invoice history: %w", err)
+	}
+	total, err := s.queries.CountInvoicesForAdmin(ctx, statusFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count invoice history: %w", err)
+	}
+	totals, err := s.queries.GetCommissionTotals(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load totals: %w", err)
+	}
+
+	out := &commissionModel.AdminInvoicesResponse{
+		Invoices: make([]commissionModel.AdminInvoice, 0, len(rows)),
+		Total:    total,
+		Totals: commissionModel.Totals{
+			TotalOutstanding: numericString(totals.TotalOutstanding),
+			TotalOverdue:     numericString(totals.TotalOverdue),
+			TotalCollected:   numericString(totals.TotalCollected),
+		},
+	}
+	for _, r := range rows {
+		inv := commissionModel.AdminInvoice{
+			Invoice: commissionModel.Invoice{
+				PublicID:         r.PublicID.String(),
+				PeriodStart:      r.PeriodStart.Time,
+				PeriodEnd:        r.PeriodEnd.Time,
+				TotalAmount:      numericString(r.TotalAmount),
+				Status:           r.Status,
+				IssuedAt:         r.IssuedAt.Time,
+				DueAt:            r.DueAt.Time,
+				IsOverdue:        r.Status == "unpaid" && r.DueAt.Valid && r.DueAt.Time.Before(time.Now()),
+				PaymentMethod:    r.PaymentMethod.String,
+				PaymentReference: r.PaymentReference.String,
+				WaivedReason:     r.WaivedReason.String,
+			},
+			SellerPublicID: r.SellerPublicID.String(),
+			SellerName:     r.SellerName,
+			SellerPhone:    r.SellerPhone.String,
+			RecordedByName: r.RecordedByName.String,
+			PaymentNote:    r.PaymentNote.String,
+		}
+		if r.PaidAt.Valid {
+			paid := r.PaidAt.Time
+			inv.PaidAt = &paid
+		}
+		out.Invoices = append(out.Invoices, inv)
+	}
+	return out, nil
+}

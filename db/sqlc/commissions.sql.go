@@ -40,6 +40,20 @@ func (q *Queries) AttachChargesToInvoice(ctx context.Context, arg AttachChargesT
 	return result.RowsAffected(), nil
 }
 
+const countInvoicesForAdmin = `-- name: CountInvoicesForAdmin :one
+SELECT COUNT(*) FROM commission_invoices i
+WHERE ($1::text = ''
+       OR ($1::text = 'settled' AND i.status IN ('paid', 'waived'))
+       OR i.status = $1::text)
+`
+
+func (q *Queries) CountInvoicesForAdmin(ctx context.Context, statusFilter string) (int64, error) {
+	row := q.db.QueryRow(ctx, countInvoicesForAdmin, statusFilter)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countSellerBalances = `-- name: CountSellerBalances :one
 SELECT COUNT(DISTINCT seller_id) FROM commission_invoices
 WHERE status = 'unpaid'
@@ -416,11 +430,18 @@ func (q *Queries) ListInvoicesBySeller(ctx context.Context, arg ListInvoicesBySe
 }
 
 const listInvoicesForAdmin = `-- name: ListInvoicesForAdmin :many
-SELECT i.id, i.public_id, i.seller_id, i.period_start, i.period_end, i.total_amount, i.status, i.issued_at, i.due_at, i.paid_at, i.payment_method, i.payment_reference, i.payment_note, i.waived_reason, i.recorded_by_admin_id, i.created_at, i.updated_at, i.last_reminder_at, i.reminder_count, u.name AS seller_name, u.phone AS seller_phone, u.public_id AS seller_public_id
+SELECT i.id, i.public_id, i.seller_id, i.period_start, i.period_end, i.total_amount, i.status, i.issued_at, i.due_at, i.paid_at, i.payment_method, i.payment_reference, i.payment_note, i.waived_reason, i.recorded_by_admin_id, i.created_at, i.updated_at, i.last_reminder_at, i.reminder_count,
+       u.name       AS seller_name,
+       u.phone      AS seller_phone,
+       u.public_id  AS seller_public_id,
+       a.name       AS recorded_by_name
 FROM commission_invoices i
 JOIN users u ON u.id = i.seller_id
-WHERE ($3::text = '' OR i.status = $3::text)
-ORDER BY i.issued_at DESC
+LEFT JOIN users a ON a.id = i.recorded_by_admin_id
+WHERE ($3::text = ''
+       OR ($3::text = 'settled' AND i.status IN ('paid', 'waived'))
+       OR i.status = $3::text)
+ORDER BY COALESCE(i.paid_at, i.updated_at) DESC
 LIMIT $1 OFFSET $2
 `
 
@@ -453,8 +474,17 @@ type ListInvoicesForAdminRow struct {
 	SellerName        string             `json:"seller_name"`
 	SellerPhone       pgtype.Text        `json:"seller_phone"`
 	SellerPublicID    pgtype.UUID        `json:"seller_public_id"`
+	RecordedByName    pgtype.Text        `json:"recorded_by_name"`
 }
 
+// The settled ledger. The balances list above is a worklist and shows only what
+// is still owed, so without this an invoice disappears the moment it is paid and
+// there is no record of what was collected, from whom, or by which admin.
+//
+// 'settled' groups paid and waived: both are closed, and an admin looking back
+// at a week wants them side by side rather than in two tabs.
+// Ordered by when it was closed, not when it was issued: this is a record of
+// collection activity, and paid_at is null only for waived rows.
 func (q *Queries) ListInvoicesForAdmin(ctx context.Context, arg ListInvoicesForAdminParams) ([]ListInvoicesForAdminRow, error) {
 	rows, err := q.db.Query(ctx, listInvoicesForAdmin, arg.Limit, arg.Offset, arg.StatusFilter)
 	if err != nil {
@@ -487,6 +517,7 @@ func (q *Queries) ListInvoicesForAdmin(ctx context.Context, arg ListInvoicesForA
 			&i.SellerName,
 			&i.SellerPhone,
 			&i.SellerPublicID,
+			&i.RecordedByName,
 		); err != nil {
 			return nil, err
 		}

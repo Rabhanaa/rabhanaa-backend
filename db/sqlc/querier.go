@@ -66,6 +66,7 @@ type Querier interface {
 	CountAllUsersAnyStatus(ctx context.Context) (int64, error)
 	CountBuyRequestsByOwner(ctx context.Context, ownerID int32) (int64, error)
 	CountCarrierRegions(ctx context.Context, userID int32) (int64, error)
+	CountInvoicesForAdmin(ctx context.Context, statusFilter string) (int64, error)
 	CountModeratableBuyRequests(ctx context.Context) (int64, error)
 	CountModeratableSellAuctions(ctx context.Context) (int64, error)
 	CountMonthlyBuyCancellations(ctx context.Context, ownerID int32) (int64, error)
@@ -231,6 +232,14 @@ type Querier interface {
 	ListCompletedOrdersWithoutCharge(ctx context.Context, arg ListCompletedOrdersWithoutChargeParams) ([]ListCompletedOrdersWithoutChargeRow, error)
 	ListInterests(ctx context.Context) ([]Interest, error)
 	ListInvoicesBySeller(ctx context.Context, arg ListInvoicesBySellerParams) ([]CommissionInvoice, error)
+	// The settled ledger. The balances list above is a worklist and shows only what
+	// is still owed, so without this an invoice disappears the moment it is paid and
+	// there is no record of what was collected, from whom, or by which admin.
+	//
+	// 'settled' groups paid and waived: both are closed, and an admin looking back
+	// at a week wants them side by side rather than in two tabs.
+	// Ordered by when it was closed, not when it was issued: this is a record of
+	// collection activity, and paid_at is null only for waived rows.
 	ListInvoicesForAdmin(ctx context.Context, arg ListInvoicesForAdminParams) ([]ListInvoicesForAdminRow, error)
 	// Payment reminders. Candidates are unpaid invoices that are due and either
 	// never reminded or last reminded longer ago than the configured interval. The

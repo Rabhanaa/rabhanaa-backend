@@ -75,6 +75,27 @@ type Totals struct {
 	TotalCollected   string `json:"total_collected"`
 }
 
+// AdminInvoice is a settled invoice as the admin ledger shows it: the invoice
+// plus who owed it and who closed it. The balances list is a worklist of what is
+// still owed, so this is the only record of what was actually collected.
+type AdminInvoice struct {
+	Invoice
+	SellerPublicID string `json:"seller_public_id"`
+	SellerName     string `json:"seller_name"`
+	SellerPhone    string `json:"seller_phone"`
+	RecordedByName string `json:"recorded_by_name,omitempty"`
+	PaymentNote    string `json:"payment_note,omitempty"`
+}
+
+type AdminInvoicesResponse struct {
+	Invoices []AdminInvoice `json:"invoices"`
+	Total    int64          `json:"total"`
+	Page     int32          `json:"page"`
+	// Repeated from the balances response so the header figures are correct
+	// whichever list the admin opened first.
+	Totals Totals `json:"totals"`
+}
+
 // SellerDetail is one seller's full history, for the admin who is about to phone
 // them.
 type SellerDetail struct {
