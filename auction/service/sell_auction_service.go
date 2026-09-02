@@ -440,10 +440,20 @@ func (s *SellAuctionService) initialStatus() string {
 }
 
 // SupplySideRoles are the merchant types a retailer is allowed to see sell posts
-// from. Kept in sync with SUPPLY_SIDE_ROLES in frontend RegisterPage.tsx, which
+// from. Kept in sync with SUPPLY_SIDE_ROLES in the frontend's lib/roles.ts, which
 // decides who is asked the supplies-to-retail question — if these two disagree,
 // a merchant can be offered that question yet stay invisible to retailers.
-var SupplySideRoles = []string{"importer", "wholesaler", "distributor", "processor", "supplier"}
+//
+// Wholesalers only, by the client's decision: selling to retail is the
+// wholesaler's role in this market, and importers, distributors and factories
+// trade with each other rather than with shops. This list drives three things
+// together — which posts a retailer sees, which new posts notify retailers, and
+// who is offered the toggle — so narrowing it here narrows all three.
+//
+// Widening it again is safe: the merchants opted in by migration 044 keep
+// supplies_to_retail = true, so they would reappear rather than need a second
+// backfill.
+var SupplySideRoles = []string{"wholesaler"}
 
 // RetailerRoleKey matches the jobs row added in migration 040.
 const RetailerRoleKey = "retailer"
