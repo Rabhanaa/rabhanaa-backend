@@ -1161,6 +1161,28 @@ func (q *Queries) SearchUsersCount(ctx context.Context, arg SearchUsersCountPara
 	return count, err
 }
 
+const setSuppliesToRetail = `-- name: SetSuppliesToRetail :exec
+UPDATE users
+SET
+    supplies_to_retail = $2,
+    updated_at = NOW()
+WHERE users.id = $1
+`
+
+type SetSuppliesToRetailParams struct {
+	ID               int32 `json:"id"`
+	SuppliesToRetail bool  `json:"supplies_to_retail"`
+}
+
+// Whether a supply-side merchant is willing to sell to retailers (#7). Kept as
+// its own statement rather than folded into UpdateUserProfileWithNames: that one
+// is called with a full profile payload, and a bool absent from such a payload
+// would read as false and silently opt the merchant out.
+func (q *Queries) SetSuppliesToRetail(ctx context.Context, arg SetSuppliesToRetailParams) error {
+	_, err := q.db.Exec(ctx, setSuppliesToRetail, arg.ID, arg.SuppliesToRetail)
+	return err
+}
+
 const suspendUser = `-- name: SuspendUser :execrows
 UPDATE users
 SET status = 'suspended',

@@ -286,6 +286,11 @@ type Querier interface {
 	SearchUsersCount(ctx context.Context, arg SearchUsersCountParams) (int64, error)
 	SelectSellBid(ctx context.Context, id int32) error
 	SelectSellWinner(ctx context.Context, arg SelectSellWinnerParams) error
+	// Whether a supply-side merchant is willing to sell to retailers (#7). Kept as
+	// its own statement rather than folded into UpdateUserProfileWithNames: that one
+	// is called with a full profile payload, and a bool absent from such a payload
+	// would read as false and silently opt the merchant out.
+	SetSuppliesToRetail(ctx context.Context, arg SetSuppliesToRetailParams) error
 	SumAcceptedQuantityByRequest(ctx context.Context, buyRequestID int32) (pgtype.Numeric, error)
 	SuspendBuyRequest(ctx context.Context, arg SuspendBuyRequestParams) (BuyRequest, error)
 	SuspendSellAuction(ctx context.Context, arg SuspendSellAuctionParams) (SellAuction, error)

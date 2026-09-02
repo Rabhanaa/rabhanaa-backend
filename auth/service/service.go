@@ -41,6 +41,7 @@ type AuthRepository interface {
 
 	UpdateUserProfile(ctx context.Context, params sqlc.UpdateUserProfileParams) error
 	UpdateUserProfileWithNames(ctx context.Context, params sqlc.UpdateUserProfileWithNamesParams) error
+	SetSuppliesToRetail(ctx context.Context, params sqlc.SetSuppliesToRetailParams) error
 	UpdateUserCachedNames(ctx context.Context, params sqlc.UpdateUserCachedNamesParams) error
 
 	GetRegionByID(ctx context.Context, id int32) (sqlc.Region, error)

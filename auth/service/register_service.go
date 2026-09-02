@@ -220,11 +220,23 @@ func (s *AuthService) validateJobExists(ctx context.Context, jobID int32) error 
 }
 
 func (s *AuthService) UpdateProfile(ctx context.Context, userID int32, req model.ProfileRequest) error {
-	return s.repo.UpdateUserProfileWithNames(ctx, sqlc.UpdateUserProfileWithNamesParams{
+	if err := s.repo.UpdateUserProfileWithNames(ctx, sqlc.UpdateUserProfileWithNamesParams{
 		ID:       userID,
 		JobID:    pgtype.Int4{Int32: req.JobID, Valid: true},
 		RegionID: pgtype.Int4{Int32: req.RegionID, Valid: true},
-	})
+	}); err != nil {
+		return err
+	}
+
+	// Only when the client actually sent it — see ProfileRequest. Retailers and
+	// carriers never see the question, so they never send it either.
+	if req.SuppliesToRetail != nil {
+		return s.repo.SetSuppliesToRetail(ctx, sqlc.SetSuppliesToRetailParams{
+			ID:               userID,
+			SuppliesToRetail: *req.SuppliesToRetail,
+		})
+	}
+	return nil
 }
 
 func (s *AuthService) UpdateInterests(ctx context.Context, userID int32, req model.InterestsRequest) error {

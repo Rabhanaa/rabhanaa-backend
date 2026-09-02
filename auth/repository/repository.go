@@ -226,6 +226,10 @@ func (r *Repository) UpdateUserProfileWithNames(ctx context.Context, params sqlc
 	return r.queries.UpdateUserProfileWithNames(ctx, params)
 }
 
+func (r *Repository) SetSuppliesToRetail(ctx context.Context, params sqlc.SetSuppliesToRetailParams) error {
+	return r.queries.SetSuppliesToRetail(ctx, params)
+}
+
 func (r *Repository) UpdateUserCachedNames(ctx context.Context, params sqlc.UpdateUserCachedNamesParams) error {
 	return r.queries.UpdateUserCachedNames(ctx, params)
 }

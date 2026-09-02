@@ -91,6 +91,17 @@ SET
     updated_at = NOW()
 WHERE users.id = $1;
 
+-- name: SetSuppliesToRetail :exec
+-- Whether a supply-side merchant is willing to sell to retailers (#7). Kept as
+-- its own statement rather than folded into UpdateUserProfileWithNames: that one
+-- is called with a full profile payload, and a bool absent from such a payload
+-- would read as false and silently opt the merchant out.
+UPDATE users
+SET
+    supplies_to_retail = $2,
+    updated_at = NOW()
+WHERE users.id = $1;
+
 -- name: UpdateUserCachedNames :exec
 UPDATE users
 SET 

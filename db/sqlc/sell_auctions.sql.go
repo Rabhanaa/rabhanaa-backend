@@ -88,7 +88,8 @@ WHERE status = 'active' AND end_time > NOW()
   ))
   AND ($4::int = 0 OR region_id = $4::int)
   AND ($5::text[] IS NULL OR cardinality($5::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY($5::text[])))
+    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY($5::text[])
+      AND ow.supplies_to_retail))
 `
 
 type CountActiveSellAuctionsParams struct {
@@ -157,7 +158,8 @@ WHERE status = 'active' AND end_time > NOW()
   ))
   AND ($5::int = 0 OR region_id = $5::int)
   AND ($6::text[] IS NULL OR cardinality($6::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY($6::text[])))
+    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY($6::text[])
+      AND ow.supplies_to_retail))
 `
 
 type CountSearchSellAuctionsParams struct {
@@ -694,7 +696,8 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   ))
   AND ($6::int = 0 OR sa.region_id = $6::int)
   AND ($7::text[] IS NULL OR cardinality($7::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY($7::text[])))
+    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY($7::text[])
+      AND ow.supplies_to_retail))
 ORDER BY
   CASE WHEN sa.interest_id = ANY($8::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
@@ -1059,7 +1062,8 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   ))
   AND ($7::int = 0 OR sa.region_id = $7::int)
   AND ($8::text[] IS NULL OR cardinality($8::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY($8::text[])))
+    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY($8::text[])
+      AND ow.supplies_to_retail))
 ORDER BY
   CASE WHEN sa.interest_id = ANY($9::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC

@@ -21,7 +21,8 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   ))
   AND (@filter_region_id::int = 0 OR sa.region_id = @filter_region_id::int)
   AND (@owner_job_keys::text[] IS NULL OR cardinality(@owner_job_keys::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY(@owner_job_keys::text[])))
+    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY(@owner_job_keys::text[])
+      AND ow.supplies_to_retail))
 ORDER BY
   CASE WHEN sa.interest_id = ANY(@user_interest_ids::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
@@ -36,7 +37,8 @@ WHERE status = 'active' AND end_time > NOW()
   ))
   AND (@filter_region_id::int = 0 OR region_id = @filter_region_id::int)
   AND (@owner_job_keys::text[] IS NULL OR cardinality(@owner_job_keys::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY(@owner_job_keys::text[])));
+    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY(@owner_job_keys::text[])
+      AND ow.supplies_to_retail));
 
 -- name: SearchSellAuctions :many
 SELECT sa.* FROM sell_auctions sa
@@ -48,7 +50,8 @@ WHERE sa.status = 'active' AND sa.end_time > NOW()
   ))
   AND (@filter_region_id::int = 0 OR sa.region_id = @filter_region_id::int)
   AND (@owner_job_keys::text[] IS NULL OR cardinality(@owner_job_keys::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY(@owner_job_keys::text[])))
+    SELECT 1 FROM users ow WHERE ow.id = sa.owner_id AND ow.job_key = ANY(@owner_job_keys::text[])
+      AND ow.supplies_to_retail))
 ORDER BY
   CASE WHEN sa.interest_id = ANY(@user_interest_ids::integer[]) THEN 0 ELSE 1 END,
   sa.created_at DESC
@@ -64,7 +67,8 @@ WHERE status = 'active' AND end_time > NOW()
   ))
   AND (@filter_region_id::int = 0 OR region_id = @filter_region_id::int)
   AND (@owner_job_keys::text[] IS NULL OR cardinality(@owner_job_keys::text[]) = 0 OR EXISTS (
-    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY(@owner_job_keys::text[])));
+    SELECT 1 FROM users ow WHERE ow.id = owner_id AND ow.job_key = ANY(@owner_job_keys::text[])
+      AND ow.supplies_to_retail));
 
 -- name: ListSellAuctionsByOwner :many
 SELECT * FROM sell_auctions WHERE owner_id = $1

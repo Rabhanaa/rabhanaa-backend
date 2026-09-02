@@ -25,6 +25,11 @@ type RegisterRequest struct {
 type ProfileRequest struct {
 	JobID    int32 `json:"job_id" binding:"required"`
 	RegionID int32 `json:"region_id" binding:"required"`
+	// A pointer so that omitting the field leaves the setting alone. A plain
+	// bool would arrive as false from any client that does not send it — every
+	// existing one — and quietly hide the merchant from retailers on the next
+	// unrelated profile edit (#7).
+	SuppliesToRetail *bool `json:"supplies_to_retail"`
 }
 
 type InterestsRequest struct {
