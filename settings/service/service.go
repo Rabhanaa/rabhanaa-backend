@@ -41,7 +41,18 @@ const (
 	// seller once it is due. Read at send time, so changing it takes effect on
 	// the next sweep.
 	KeyCommissionReminderDays = "commission_reminder_days"
+	// KeyCommissionStartDate is the earliest sale that may be charged, as
+	// YYYY-MM-DD, or CommissionStartAll to bill the whole history. It exists
+	// because switching commission on without it invoiced merchants for deals
+	// they had closed months earlier, before any commission was announced.
+	KeyCommissionStartDate = "commission_start_date"
 )
+
+// CommissionStartAll disables the cutoff and bills every completed sale ever
+// recorded. Reachable from the admin screen, but a deliberate choice.
+const CommissionStartAll = "all"
+
+const commissionStartDateLayout = "2006-01-02"
 
 // Values for KeyCarrierQuoteStage.
 const (
@@ -101,6 +112,14 @@ var CommissionWeekDays = []string{
 	"saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday",
 }
 
+func isStartDate(candidate string) bool {
+	if candidate == CommissionStartAll {
+		return true
+	}
+	_, err := time.Parse(commissionStartDateLayout, candidate)
+	return err == nil
+}
+
 var weekdays = map[string]time.Weekday{
 	"sunday": time.Sunday, "monday": time.Monday, "tuesday": time.Tuesday,
 	"wednesday": time.Wednesday, "thursday": time.Thursday,
@@ -114,6 +133,7 @@ var allowed = map[string]validator{
 	KeyCommissionGraceDays:    intRange(0, 90),
 	// At least one day: a smaller value would notify on every cron tick.
 	KeyCommissionReminderDays: intRange(1, 30),
+	KeyCommissionStartDate:    isStartDate,
 }
 
 var defaults = map[string]string{
@@ -122,6 +142,9 @@ var defaults = map[string]string{
 	KeyCommissionWeekCloseDay: "saturday",
 	KeyCommissionGraceDays:    "3",
 	KeyCommissionReminderDays: "2",
+	// Defaults to the whole history so an existing deployment's behaviour does
+	// not change silently; production sets a real date.
+	KeyCommissionStartDate: CommissionStartAll,
 }
 
 var ErrUnknownSetting = errors.New("UNKNOWN_SETTING")
@@ -266,4 +289,23 @@ func (s *Service) CommissionGraceDays() int {
 		return 3
 	}
 	return n
+}
+
+// CommissionStartDate is the earliest completed sale that may be charged. The
+// zero time means no cutoff.
+//
+// An unparsable stored value returns the zero time — billing more than intended
+// is recoverable by deleting charges, whereas silently billing nothing would
+// look like the feature working correctly while collecting nothing.
+func (s *Service) CommissionStartDate() time.Time {
+	v := s.Get(KeyCommissionStartDate)
+	if v == "" || v == CommissionStartAll {
+		return time.Time{}
+	}
+	d, err := time.Parse(commissionStartDateLayout, v)
+	if err != nil {
+		slog.Error("invalid commission start date stored, billing all history", "value", v)
+		return time.Time{}
+	}
+	return d
 }

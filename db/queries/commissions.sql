@@ -16,6 +16,12 @@ WHERE o.status = 'completed'
   -- Production is almost entirely seeded; billing the seeder would bury every
   -- real debt under fiction.
   AND s.email <> @seed_email::text
+  -- Sales completed before commission existed are not billable. Without this,
+  -- switching the feature on hands every merchant an invoice for deals they
+  -- closed months ago — on the first deploy that was five orders from May, to
+  -- three real merchants, none of whom had ever been told about a commission.
+  -- The caller passes the configured start date, or the zero time for "all".
+  AND o.completed_at >= @accrue_from::timestamptz
 ORDER BY o.completed_at
 LIMIT $1;
 

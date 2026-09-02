@@ -87,9 +87,14 @@ func ComputeCharge(unitPrice, quantity, ratePercent decimal.Decimal) (dealValue,
 // were never completed. Reading the table instead is idempotent (order_id is
 // UNIQUE), self-healing after downtime, and auditable.
 func (s *Service) AccrueCharges(ctx context.Context) (int, error) {
+	// The cutoff is what stops switching this feature on from billing months of
+	// history. On the first production deploy, before this existed, the very
+	// first tick charged five sales from three months earlier — to three real
+	// merchants who had never been told a commission existed.
 	orders, err := s.queries.ListCompletedOrdersWithoutCharge(ctx, sqlc.ListCompletedOrdersWithoutChargeParams{
-		SeedEmail: s.seedUserEmail,
-		Limit:     accrualBatchSize,
+		SeedEmail:  s.seedUserEmail,
+		Limit:      accrualBatchSize,
+		AccrueFrom: pgtype.Timestamptz{Time: s.settings.CommissionStartDate(), Valid: true},
 	})
 	if err != nil {
 		return 0, fmt.Errorf("failed to list uncharged orders: %w", err)

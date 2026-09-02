@@ -327,13 +327,20 @@ WHERE o.status = 'completed'
   -- Production is almost entirely seeded; billing the seeder would bury every
   -- real debt under fiction.
   AND s.email <> $2::text
+  -- Sales completed before commission existed are not billable. Without this,
+  -- switching the feature on hands every merchant an invoice for deals they
+  -- closed months ago — on the first deploy that was five orders from May, to
+  -- three real merchants, none of whom had ever been told about a commission.
+  -- The caller passes the configured start date, or the zero time for "all".
+  AND o.completed_at >= $3::timestamptz
 ORDER BY o.completed_at
 LIMIT $1
 `
 
 type ListCompletedOrdersWithoutChargeParams struct {
-	Limit     int32  `json:"limit"`
-	SeedEmail string `json:"seed_email"`
+	Limit      int32              `json:"limit"`
+	SeedEmail  string             `json:"seed_email"`
+	AccrueFrom pgtype.Timestamptz `json:"accrue_from"`
 }
 
 type ListCompletedOrdersWithoutChargeRow struct {
@@ -351,7 +358,7 @@ type ListCompletedOrdersWithoutChargeRow struct {
 // applied, and accruing there would bill orders that never completed. Running
 // this every minute is idempotent because commission_charges.order_id is UNIQUE.
 func (q *Queries) ListCompletedOrdersWithoutCharge(ctx context.Context, arg ListCompletedOrdersWithoutChargeParams) ([]ListCompletedOrdersWithoutChargeRow, error) {
-	rows, err := q.db.Query(ctx, listCompletedOrdersWithoutCharge, arg.Limit, arg.SeedEmail)
+	rows, err := q.db.Query(ctx, listCompletedOrdersWithoutCharge, arg.Limit, arg.SeedEmail, arg.AccrueFrom)
 	if err != nil {
 		return nil, err
 	}
