@@ -67,9 +67,9 @@ func (c *Client) buildLink(data map[string]string) string {
 		if id := data["request_id"]; id != "" {
 			return c.baseURL + "/auctions/buy/" + id
 		}
-	// Shipping quotes (#14). The merchant lands on the deal to compare prices;
-	// the carrier lands on the same place to see the verdict in context.
-	case "shipping_quote_received", "shipping_quote_accepted", "shipping_quote_rejected":
+	// Shipping quotes (#14). Only the merchant owns the deal, so only the
+	// merchant is sent to it.
+	case "shipping_quote_received":
 		if id := data["order_id"]; id != "" {
 			return c.baseURL + "/orders/" + id
 		}
@@ -79,6 +79,18 @@ func (c *Client) buildLink(data map[string]string) string {
 		if id := data["request_id"]; id != "" {
 			return c.baseURL + "/auctions/buy/" + id
 		}
+	// A verdict only ever goes to a carrier, and a carrier is not a party to the
+	// order — sending it to the deal hands it NOT_ORDER_PARTICIPANT and a blank
+	// screen. Its own quote list is where the answer lives.
+	//
+	// This has to agree with resolveNotificationLink in the frontend, and it is
+	// the side that wins: the link is copied into data as _url, which that
+	// function returns before it ever reaches its own switch. A disagreement
+	// here silently overrides the frontend for push, while in-app taps (whose
+	// stored rows carry no _url) still follow the frontend — the two paths then
+	// go to different places for the same notification.
+	case "shipping_quote_accepted", "shipping_quote_rejected":
+		return c.baseURL + "/carrier/quotes"
 	// Moderation verdicts (#18) — either kind of post, so try both ids.
 	case "post_approved", "post_rejected", "post_suspended":
 		if id := data["auction_id"]; id != "" {
