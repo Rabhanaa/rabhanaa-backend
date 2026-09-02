@@ -18,6 +18,7 @@ coverage.out
 
 # IDE
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
@@ -42,7 +43,3 @@ uploads/*
 
 # Firebase.json
 firebase.json
-branch_structure.json
-temp_auto_push.bat
-temp_interactive_push.bat
-.gitignore
