@@ -29,9 +29,8 @@ type AuthRepository interface {
 
 	GetUserInterests(ctx context.Context, userID int32) ([]sqlc.GetUserInterestsRow, error)
 	GetUserInterestIDs(ctx context.Context, userID int32) ([]int32, error)
-	AddUserInterest(ctx context.Context, params sqlc.AddUserInterestParams) error
-	DeleteUserInterests(ctx context.Context, userID int32) error
-	UpdateUserInterestsCount(ctx context.Context, params sqlc.UpdateUserInterestsCountParams) error
+	CountActiveInterestsByIDs(ctx context.Context, ids []int32) (int64, error)
+	ReplaceUserInterests(ctx context.Context, userID int32, interestIDs []int32) error
 	GetUserStatusData(ctx context.Context, id int32) (sqlc.GetUserStatusDataRow, error)
 
 	CreateUserDocument(ctx context.Context, params sqlc.CreateUserDocumentParams) (sqlc.UserDocument, error)

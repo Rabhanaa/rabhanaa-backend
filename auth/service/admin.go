@@ -198,6 +198,7 @@ func (s *AuthService) GetUserDetailForAdmin(ctx context.Context, userPublicID uu
 	}
 	for _, i := range interests {
 		resp.Interests = append(resp.Interests, i.ID)
+		resp.InterestNames = append(resp.InterestNames, i.NameAr)
 	}
 
 	return resp, nil

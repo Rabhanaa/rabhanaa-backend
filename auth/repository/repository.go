@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"rabhana/auth/service"
 	"rabhana/db/sqlc"
@@ -12,10 +14,13 @@ import (
 
 type Repository struct {
 	queries *sqlc.Queries
+	// Only for the writes that must land together; everything else goes
+	// through queries.
+	pool *pgxpool.Pool
 }
 
-func NewRepository(queries *sqlc.Queries) *Repository {
-	return &Repository{queries: queries}
+func NewRepository(queries *sqlc.Queries, pool *pgxpool.Pool) *Repository {
+	return &Repository{queries: queries, pool: pool}
 }
 
 func (r *Repository) GetQueries() *sqlc.Queries {
@@ -104,16 +109,45 @@ func (r *Repository) GetUserInterestIDs(ctx context.Context, userID int32) ([]in
 	return r.queries.GetUserInterestIDs(ctx, userID)
 }
 
-func (r *Repository) AddUserInterest(ctx context.Context, params sqlc.AddUserInterestParams) error {
-	return r.queries.AddUserInterest(ctx, params)
+func (r *Repository) CountActiveInterestsByIDs(ctx context.Context, ids []int32) (int64, error) {
+	return r.queries.CountActiveInterestsByIDs(ctx, ids)
 }
 
-func (r *Repository) DeleteUserInterests(ctx context.Context, userID int32) error {
-	return r.queries.DeleteUserInterests(ctx, userID)
-}
+// ReplaceUserInterests swaps the user's whole interest set in one transaction.
+//
+// It used to be three separate writes, which was tolerable while the only caller
+// was onboarding — a failure there just meant picking again. Now that members
+// edit an existing set from their profile, a failure between the delete and the
+// inserts would wipe interests they already had, and interests_count would
+// disagree with the rows it is meant to count.
+func (r *Repository) ReplaceUserInterests(ctx context.Context, userID int32, interestIDs []int32) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
 
-func (r *Repository) UpdateUserInterestsCount(ctx context.Context, params sqlc.UpdateUserInterestsCountParams) error {
-	return r.queries.UpdateUserInterestsCount(ctx, params)
+	qtx := r.queries.WithTx(tx)
+
+	if err := qtx.DeleteUserInterests(ctx, userID); err != nil {
+		return fmt.Errorf("failed to delete existing interests: %w", err)
+	}
+	for _, interestID := range interestIDs {
+		if err := qtx.AddUserInterest(ctx, sqlc.AddUserInterestParams{
+			UserID:     userID,
+			InterestID: interestID,
+		}); err != nil {
+			return fmt.Errorf("failed to add interest %d: %w", interestID, err)
+		}
+	}
+	if err := qtx.UpdateUserInterestsCount(ctx, sqlc.UpdateUserInterestsCountParams{
+		ID:             userID,
+		InterestsCount: int32(len(interestIDs)),
+	}); err != nil {
+		return fmt.Errorf("failed to update interests count: %w", err)
+	}
+
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) GetUserStatusData(ctx context.Context, id int32) (sqlc.GetUserStatusDataRow, error) {

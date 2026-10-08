@@ -73,7 +73,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 
 	// Initialize auth layer (repository only; service wired after notification service)
 	authConfig := authCtxPkg.LoadAuthConfig()
-	authRepository := authRepoPkg.NewRepository(queries)
+	authRepository := authRepoPkg.NewRepository(queries, dbClient.Pool)
 
 	// Initialize MinIO client (non-fatal: server starts without storage, uploads return errors)
 	minioClient, err := minioPkg.NewClient(ctx, minioPkg.Config{

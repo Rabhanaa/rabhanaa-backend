@@ -58,6 +58,7 @@ type Querier interface {
 	ConfirmOrderAsSeller(ctx context.Context, id int32) error
 	ConsumePasswordResetCode(ctx context.Context, id int32) error
 	CountActiveBuyRequests(ctx context.Context, arg CountActiveBuyRequestsParams) (int64, error)
+	CountActiveInterestsByIDs(ctx context.Context, ids []int32) (int64, error)
 	CountActiveSellAuctions(ctx context.Context, arg CountActiveSellAuctionsParams) (int64, error)
 	CountActiveSellBidsByBidder(ctx context.Context, bidderID int32) (int64, error)
 	CountActiveSellBidsByUser(ctx context.Context, bidderID int32) (int64, error)

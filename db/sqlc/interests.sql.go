@@ -9,6 +9,17 @@ import (
 	"context"
 )
 
+const countActiveInterestsByIDs = `-- name: CountActiveInterestsByIDs :one
+SELECT COUNT(*) FROM interests WHERE id = ANY($1::int[]) AND is_active = TRUE
+`
+
+func (q *Queries) CountActiveInterestsByIDs(ctx context.Context, ids []int32) (int64, error) {
+	row := q.db.QueryRow(ctx, countActiveInterestsByIDs, ids)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getInterestByID = `-- name: GetInterestByID :one
 SELECT id, name_ar, name_en, is_active, created_at FROM interests WHERE id = $1
 `

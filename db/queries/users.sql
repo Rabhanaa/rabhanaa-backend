@@ -63,7 +63,8 @@ SELECT COUNT(*) FROM users WHERE status = $1;
 -- name: GetUserInterests :many
 SELECT i.id, i.name_ar, i.name_en FROM interests i
 JOIN user_interests ui ON ui.interest_id = i.id
-WHERE ui.user_id = $1;
+WHERE ui.user_id = $1
+ORDER BY i.name_ar;
 
 -- name: AddUserInterest :exec
 INSERT INTO user_interests (user_id, interest_id) VALUES ($1, $2)

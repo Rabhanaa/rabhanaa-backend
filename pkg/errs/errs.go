@@ -24,6 +24,8 @@ var (
 	ErrInvalidRegionID          = errors.New("INVALID_REGION_ID")
 	ErrInvalidJobID             = errors.New("INVALID_JOB_ID")
 	ErrInvalidSignupSource      = errors.New("INVALID_SIGNUP_SOURCE")
+	ErrInsufficientInterests    = errors.New("INSUFFICIENT_INTERESTS")
+	ErrInvalidInterests         = errors.New("INVALID_INTERESTS")
 
 	// Carrier accounts (#14).
 	ErrCarrierOnly            = errors.New("CARRIER_ONLY")
@@ -114,6 +116,8 @@ var ArabicMessages = map[string]string{
 	"INVALID_REGION_ID":           "المنطقة المحددة غير موجودة",
 	"INVALID_JOB_ID":              "المهنة المحددة غير موجودة",
 	"INVALID_SIGNUP_SOURCE":       "مصدر التسجيل غير صحيح",
+	"INSUFFICIENT_INTERESTS":      "عدد الاهتمامات المختارة أقل من المطلوب",
+	"INVALID_INTERESTS":           "بعض الاهتمامات المختارة لم تعد متاحة — حدّث الصفحة واختر مرة أخرى",
 	"AUCTION_NOT_FOUND":           "الصفقة غير موجودة",
 	"INVALID_POST_TYPE":           "نوع المنشور غير صحيح",
 	"SHIPPING_COMPANY_NOT_FOUND":  "شركة الشحن غير موجودة",

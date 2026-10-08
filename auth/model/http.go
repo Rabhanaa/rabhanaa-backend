@@ -100,4 +100,9 @@ type UserResponse struct {
 	BannedReason           string     `json:"banned_reason,omitempty"`
 	StatusChangedByAdminID *string    `json:"status_changed_by_admin_id,omitempty"`
 	StatusChangedAt        *time.Time `json:"status_changed_at,omitempty"`
+
+	// Admin detail only, next to the ids in Interests. Resolved here rather than
+	// by the admin page because GET /interests leaves out inactive ones, which
+	// members may still hold.
+	InterestNames []string `json:"interest_names,omitempty"`
 }

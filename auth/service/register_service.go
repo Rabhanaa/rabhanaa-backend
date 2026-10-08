@@ -243,32 +243,41 @@ func (s *AuthService) UpdateProfile(ctx context.Context, userID int32, req model
 	return nil
 }
 
+// UpdateInterests replaces the user's interests. Onboarding and the profile
+// page both call it, so it has to be safe to run on a set the user already has.
 func (s *AuthService) UpdateInterests(ctx context.Context, userID int32, req model.InterestsRequest) error {
-	if len(req.InterestIDs) < s.config.MinInterests {
-		return errors.New("INSUFFICIENT_INTERESTS")
+	// The insert ignores duplicates but the count did not, so [4, 4] used to be
+	// stored as one interest with interests_count = 2.
+	ids := uniqueInterestIDs(req.InterestIDs)
+	if len(ids) < s.config.MinInterests {
+		return errs.ErrInsufficientInterests
 	}
 
-	if err := s.repo.DeleteUserInterests(ctx, userID); err != nil {
-		return fmt.Errorf("failed to delete existing interests: %w", err)
+	// Pickers only offer active interests. Anything else is a stale client or a
+	// hand-made request: an unknown id would fail the foreign key part-way
+	// through, and an inactive one would subscribe the user to a category no
+	// one can post in any more.
+	active, err := s.repo.CountActiveInterestsByIDs(ctx, ids)
+	if err != nil {
+		return fmt.Errorf("failed to validate interests: %w", err)
+	}
+	if int(active) != len(ids) {
+		return errs.ErrInvalidInterests
 	}
 
-	for _, interestID := range req.InterestIDs {
-		if err := s.repo.AddUserInterest(ctx, sqlc.AddUserInterestParams{
-			UserID:     userID,
-			InterestID: interestID,
-		}); err != nil {
-			return fmt.Errorf("failed to add interest %d: %w", interestID, err)
+	return s.repo.ReplaceUserInterests(ctx, userID, ids)
+}
+
+func uniqueInterestIDs(ids []int32) []int32 {
+	seen := make(map[int32]bool, len(ids))
+	out := make([]int32, 0, len(ids))
+	for _, id := range ids {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
 		}
 	}
-
-	if err := s.repo.UpdateUserInterestsCount(ctx, sqlc.UpdateUserInterestsCountParams{
-		ID:             userID,
-		InterestsCount: int32(len(req.InterestIDs)),
-	}); err != nil {
-		return fmt.Errorf("failed to update interests count: %w", err)
-	}
-
-	return nil
+	return out
 }
 
 func (s *AuthService) GetUserByPublicID(ctx context.Context, publicID uuid.UUID) (*model.User, error) {
