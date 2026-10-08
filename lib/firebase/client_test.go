@@ -62,6 +62,11 @@ func TestBuildLink(t *testing.T) {
 			want: "",
 		},
 		{
+			name: "published news opens the article",
+			data: map[string]string{"type": "news_published", "news_id": "news-1"},
+			want: base + "/news/news-1?src=push",
+		},
+		{
 			name: "missing id carries no link rather than a broken one",
 			data: map[string]string{"type": "shipping_quote_received"},
 			want: "",

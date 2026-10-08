@@ -37,6 +37,36 @@ func (q *Queries) GetInterestByID(ctx context.Context, id int32) (Interest, erro
 	return i, err
 }
 
+const listActiveInterestsByIDs = `-- name: ListActiveInterestsByIDs :many
+SELECT id, name_ar, name_en, is_active, created_at FROM interests WHERE id = ANY($1::int[]) AND is_active = TRUE ORDER BY name_ar
+`
+
+func (q *Queries) ListActiveInterestsByIDs(ctx context.Context, ids []int32) ([]Interest, error) {
+	rows, err := q.db.Query(ctx, listActiveInterestsByIDs, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Interest
+	for rows.Next() {
+		var i Interest
+		if err := rows.Scan(
+			&i.ID,
+			&i.NameAr,
+			&i.NameEn,
+			&i.IsActive,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInterests = `-- name: ListInterests :many
 SELECT id, name_ar, name_en, is_active, created_at FROM interests WHERE is_active = TRUE ORDER BY name_ar
 `

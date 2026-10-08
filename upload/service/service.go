@@ -23,10 +23,12 @@ func NewUploadService(minio *minioclient.Client, maxFileSizeMB int) *UploadServi
 	if maxFileSizeMB == 0 {
 		maxFileSizeMB = 10
 	}
+	// webp and gif are for news: most source sites serve covers as webp, and
+	// admins paste animated images into articles.
 	return &UploadService{
 		minio:        minio,
 		maxFileSize:  int64(maxFileSizeMB) * 1024 * 1024,
-		allowedTypes: []string{".jpg", ".jpeg", ".png", ".pdf"},
+		allowedTypes: []string{".jpg", ".jpeg", ".png", ".webp", ".gif", ".pdf"},
 	}
 }
 
@@ -101,6 +103,10 @@ func contentTypeFor(filename string) string {
 		return "image/jpeg"
 	case ".png":
 		return "image/png"
+	case ".webp":
+		return "image/webp"
+	case ".gif":
+		return "image/gif"
 	case ".pdf":
 		return "application/pdf"
 	default:

@@ -20,6 +20,8 @@ import (
 	"rabhana/lib/firebase"
 	minioPkg "rabhana/lib/minio"
 	"rabhana/lib/postgres"
+	"rabhana/lib/secretbox"
+	newsSvcPkg "rabhana/news/service"
 	notificationSvcPkg "rabhana/notification/service"
 	orderRepoPkg "rabhana/order/repository"
 	orderSvcPkg "rabhana/order/service"
@@ -53,6 +55,7 @@ type AppContext struct {
 	SettingsService          *settingsSvcPkg.Service
 	ShippingService          *shippingSvcPkg.Service
 	CommissionService        *commissionSvcPkg.Service
+	NewsService              *newsSvcPkg.Service
 
 	// Repositories (for handlers that need direct access)
 	SellBidRepo     auctionRepoPkg.SellBidRepository
@@ -115,7 +118,21 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 
 	// Settings an admin can change without a redeploy. Loaded once here; writes
 	// refresh the cache in place.
-	settingsService := settingsSvcPkg.NewService(queries)
+	//
+	// Secrets (AI API keys) are encrypted with SETTINGS_ENCRYPTION_KEY. Without
+	// it — or with a malformed one — the platform still starts; only saving and
+	// reading those secrets is unavailable, and the admin screen says so.
+	var settingsBox *secretbox.Box
+	if cfg.SettingsEncryptionKey != "" {
+		settingsBox, err = secretbox.New(cfg.SettingsEncryptionKey)
+		if err != nil {
+			slog.Error("SETTINGS_ENCRYPTION_KEY is invalid; stored API keys are unavailable", "error", err)
+			settingsBox = nil
+		}
+	} else {
+		slog.Warn("SETTINGS_ENCRYPTION_KEY is not set; AI API keys cannot be stored")
+	}
+	settingsService := settingsSvcPkg.NewService(queries, settingsBox)
 	settingsService.Load(ctx)
 
 	// Carrier accounts and shipping quotes (#14).
@@ -127,6 +144,9 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 	commissionService := commissionSvcPkg.NewService(
 		queries, dbClient.Pool, settingsService, notificationService, auctionSvcPkg.SeedUserEmail,
 	)
+
+	// News for Pro members (AI-drafted articles, pushed on publish).
+	newsService := newsSvcPkg.NewService(queries, dbClient.Pool, settingsService, notificationService, uploadService, cfg.AppBaseURL)
 
 	// Subscription admin service
 	subscriptionAdminSvc := subscriptionSvcPkg.NewAdminService(queries, authRepository)
@@ -259,6 +279,7 @@ func NewAppContext(ctx context.Context, cfg *AppConfig) (*AppContext, error) {
 		SettingsService:          settingsService,
 		ShippingService:          shippingService,
 		CommissionService:        commissionService,
+		NewsService:              newsService,
 		SellBidRepo:              sellBidRepo,
 		SupplyOfferRepo:          supplyOfferRepo,
 	}, nil
@@ -290,6 +311,7 @@ type AppConfig struct {
 	FirebaseCredentialsPath  string
 	FirebaseCredentialsJSON  string
 	AppBaseURL               string
+	SettingsEncryptionKey    string
 
 	MinioEndpoint      string
 	MinioAccessKey     string
@@ -327,6 +349,7 @@ func LoadAppConfig() *AppConfig {
 		FirebaseCredentialsPath:  getEnv("FIREBASE_CREDENTIALS_PATH", ""),
 		FirebaseCredentialsJSON:  getEnv("FIREBASE_CREDENTIALS_JSON", ""),
 		AppBaseURL:               getEnv("APP_BASE_URL", "http://localhost:8080"),
+		SettingsEncryptionKey:    getEnv("SETTINGS_ENCRYPTION_KEY", ""),
 
 		MinioEndpoint:      getEnv("MINIO_ENDPOINT", "localhost:9000"),
 		MinioAccessKey:     getEnv("MINIO_ACCESS_KEY", "minioadmin"),

@@ -13,7 +13,9 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"rabhana/db/sqlc"
+	"rabhana/lib/secretbox"
 )
 
 // Keys. A setting that is not listed here cannot be read or written.
@@ -46,6 +49,63 @@ const (
 	// because switching commission on without it invoiced merchants for deals
 	// they had closed months earlier, before any commission was announced.
 	KeyCommissionStartDate = "commission_start_date"
+
+	// News (AI-written articles for Pro members). The provider the editor uses
+	// by default, and each provider's model. Models have no default: names
+	// change too often to hardcode, so the admin picks one from the provider's
+	// live list.
+	KeyAIProvider      = "ai_provider"
+	KeyOpenAIModel     = "openai_model"
+	KeyGeminiModel     = "gemini_model"
+	KeyOpenRouterModel = "openrouter_model"
+	// KeyNewsNotifyMode decides who is pushed when a story is published.
+	KeyNewsNotifyMode = "news_notify_mode"
+)
+
+// Secrets. Kept out of the allowed map on purpose, so they can never be read
+// back through All() or written in plain text through Set(): they go through
+// SetSecret, which encrypts, and the API only ever returns a masked hint.
+const (
+	KeyOpenAIAPIKey     = "openai_api_key"
+	KeyGeminiAPIKey     = "gemini_api_key"
+	KeyOpenRouterAPIKey = "openrouter_api_key"
+)
+
+// Values for KeyAIProvider.
+const (
+	AIProviderOpenAI     = "openai"
+	AIProviderGemini     = "gemini"
+	AIProviderOpenRouter = "openrouter"
+)
+
+// AIProviders is the accepted set, ordered for display.
+var AIProviders = []string{AIProviderOpenAI, AIProviderGemini, AIProviderOpenRouter}
+
+// Values for KeyNewsNotifyMode. Every mode reaches Pro and non-Pro members
+// alike: a non-Pro member who taps the push is shown the story's teaser and
+// an upgrade prompt.
+const (
+	NewsNotifyOff        = "off"
+	NewsNotifyAll        = "all"
+	NewsNotifyByInterest = "by_interest"
+)
+
+var NewsNotifyModes = []string{NewsNotifyOff, NewsNotifyAll, NewsNotifyByInterest}
+
+// Values stored before every mode included non-Pro members. Never released,
+// but local and test databases may hold them.
+var legacyNewsNotifyModes = map[string]string{"all_pro": NewsNotifyAll, "pro_by_interest": NewsNotifyByInterest}
+
+var secretKeys = map[string]bool{
+	KeyOpenAIAPIKey:     true,
+	KeyGeminiAPIKey:     true,
+	KeyOpenRouterAPIKey: true,
+}
+
+// The settings key holding each provider's API key and model.
+var (
+	aiKeyFor   = map[string]string{AIProviderOpenAI: KeyOpenAIAPIKey, AIProviderGemini: KeyGeminiAPIKey, AIProviderOpenRouter: KeyOpenRouterAPIKey}
+	aiModelFor = map[string]string{AIProviderOpenAI: KeyOpenAIModel, AIProviderGemini: KeyGeminiModel, AIProviderOpenRouter: KeyOpenRouterModel}
 )
 
 // CommissionStartAll disables the cutoff and bills every completed sale ever
@@ -112,6 +172,14 @@ var CommissionWeekDays = []string{
 	"saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday",
 }
 
+// Model ids as the three providers spell them: "gpt-…", "gemini-…",
+// "vendor/model:variant" on OpenRouter.
+var modelNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,127}$`)
+
+func isModelName(candidate string) bool {
+	return modelNamePattern.MatchString(candidate)
+}
+
 func isStartDate(candidate string) bool {
 	if candidate == CommissionStartAll {
 		return true
@@ -134,6 +202,11 @@ var allowed = map[string]validator{
 	// At least one day: a smaller value would notify on every cron tick.
 	KeyCommissionReminderDays: intRange(1, 30),
 	KeyCommissionStartDate:    isStartDate,
+	KeyAIProvider:             oneOf(AIProviders...),
+	KeyOpenAIModel:            isModelName,
+	KeyGeminiModel:            isModelName,
+	KeyOpenRouterModel:        isModelName,
+	KeyNewsNotifyMode:         oneOf(NewsNotifyModes...),
 }
 
 var defaults = map[string]string{
@@ -145,10 +218,16 @@ var defaults = map[string]string{
 	// Defaults to the whole history so an existing deployment's behaviour does
 	// not change silently; production sets a real date.
 	KeyCommissionStartDate: CommissionStartAll,
+	KeyAIProvider:          AIProviderOpenAI,
+	KeyNewsNotifyMode:      NewsNotifyAll,
 }
 
 var ErrUnknownSetting = errors.New("UNKNOWN_SETTING")
 var ErrInvalidSettingValue = errors.New("INVALID_SETTING_VALUE")
+
+// ErrSecretsUnavailable means SETTINGS_ENCRYPTION_KEY is not configured, so
+// there is no way to store a secret without writing it in plain text.
+var ErrSecretsUnavailable = errors.New("SECRETS_UNAVAILABLE")
 
 type Service struct {
 	queries *sqlc.Queries
@@ -159,10 +238,16 @@ type Service struct {
 	// API is ever scaled out, this cache and the cron both need revisiting.
 	mu    sync.RWMutex
 	cache map[string]string
+
+	// Nil when SETTINGS_ENCRYPTION_KEY is unset: everything else keeps working,
+	// only storing secrets is refused.
+	box *secretbox.Box
+	// Decrypted secrets. Plain text lives only in process memory.
+	secrets map[string]string
 }
 
-func NewService(queries *sqlc.Queries) *Service {
-	return &Service{queries: queries, cache: map[string]string{}}
+func NewService(queries *sqlc.Queries, box *secretbox.Box) *Service {
+	return &Service{queries: queries, cache: map[string]string{}, box: box, secrets: map[string]string{}}
 }
 
 // Load fills the cache at boot. A failure is not fatal: Get falls back to the
@@ -178,6 +263,20 @@ func (s *Service) Load(ctx context.Context) {
 	for _, r := range rows {
 		if _, ok := allowed[r.Key]; ok {
 			s.cache[r.Key] = r.Value
+			continue
+		}
+		if secretKeys[r.Key] {
+			if s.box == nil {
+				slog.Warn("secret setting stored but SETTINGS_ENCRYPTION_KEY is not set; ignoring it", "key", r.Key)
+				continue
+			}
+			plain, err := s.box.Open(r.Value)
+			if err != nil {
+				// Most likely the encryption key changed. The admin re-enters it.
+				slog.Error("cannot decrypt secret setting; it must be entered again", "key", r.Key, "error", err)
+				continue
+			}
+			s.secrets[r.Key] = plain
 		}
 	}
 }
@@ -229,6 +328,124 @@ func (s *Service) Set(ctx context.Context, key, value string, adminID int32) err
 
 	slog.Info("app setting changed", "key", key, "value", value, "admin_id", adminID)
 	return nil
+}
+
+// SecretsAvailable reports whether secrets can be stored at all.
+func (s *Service) SecretsAvailable() bool {
+	return s.box != nil
+}
+
+// SetSecret encrypts and stores a secret. The value is never logged.
+func (s *Service) SetSecret(ctx context.Context, key, value string, adminID int32) error {
+	if !secretKeys[key] {
+		return ErrUnknownSetting
+	}
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > 512 || strings.ContainsAny(value, " \t\r\n") {
+		return ErrInvalidSettingValue
+	}
+	if s.box == nil {
+		return ErrSecretsUnavailable
+	}
+	sealed, err := s.box.Seal(value)
+	if err != nil {
+		return err
+	}
+	if _, err := s.queries.UpsertAppSetting(ctx, sqlc.UpsertAppSettingParams{
+		Key:              key,
+		Value:            sealed,
+		UpdatedByAdminID: pgtype.Int4{Int32: adminID, Valid: adminID > 0},
+	}); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	s.secrets[key] = value
+	s.mu.Unlock()
+
+	slog.Info("secret setting changed", "key", key, "admin_id", adminID)
+	return nil
+}
+
+// ClearSecret removes a stored secret.
+func (s *Service) ClearSecret(ctx context.Context, key string, adminID int32) error {
+	if !secretKeys[key] {
+		return ErrUnknownSetting
+	}
+	if err := s.queries.DeleteAppSetting(ctx, key); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	delete(s.secrets, key)
+	s.mu.Unlock()
+
+	slog.Info("secret setting cleared", "key", key, "admin_id", adminID)
+	return nil
+}
+
+// Secret returns the plain value, or "" when unset.
+func (s *Service) Secret(key string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.secrets[key]
+}
+
+// SecretHints is what the admin screen may see: for each secret, "" when unset
+// or a mask showing only the last four characters, enough to tell which key is
+// in place without exposing it.
+func (s *Service) SecretHints() map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[string]string, len(secretKeys))
+	for key := range secretKeys {
+		out[key] = maskSecret(s.secrets[key])
+	}
+	return out
+}
+
+func maskSecret(v string) string {
+	if v == "" {
+		return ""
+	}
+	if len(v) <= 8 {
+		return "••••"
+	}
+	return "••••" + v[len(v)-4:]
+}
+
+// AIProvider is the provider the news editor uses unless told otherwise.
+func (s *Service) AIProvider() string {
+	return s.Get(KeyAIProvider)
+}
+
+// IsAIProvider reports whether name is one of the supported providers.
+func IsAIProvider(name string) bool {
+	_, ok := aiKeyFor[name]
+	return ok
+}
+
+// AICredentials returns the API key and model configured for a provider.
+// Either may be empty when the admin has not set it yet.
+func (s *Service) AICredentials(provider string) (apiKey, model string) {
+	keySetting, ok := aiKeyFor[provider]
+	if !ok {
+		return "", ""
+	}
+	return s.Secret(keySetting), s.Get(aiModelFor[provider])
+}
+
+// NewsNotifyMode decides who is pushed when a story is published.
+func (s *Service) NewsNotifyMode() string {
+	mode := s.Get(KeyNewsNotifyMode)
+	if mapped, ok := legacyNewsNotifyModes[mode]; ok {
+		return mapped
+	}
+	for _, m := range NewsNotifyModes {
+		if m == mode {
+			return mode
+		}
+	}
+	return defaults[KeyNewsNotifyMode]
 }
 
 // CarrierQuoteStage is the one caller that matters today, wrapped so callers do

@@ -13,3 +13,6 @@ SET value = EXCLUDED.value,
     updated_by_admin_id = EXCLUDED.updated_by_admin_id,
     updated_at = NOW()
 RETURNING *;
+
+-- name: DeleteAppSetting :exec
+DELETE FROM app_settings WHERE key = $1;

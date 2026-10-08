@@ -14,7 +14,10 @@ type Querier interface {
 	AcceptShippingQuote(ctx context.Context, id int32) (ShippingQuote, error)
 	AcceptSupplyOffer(ctx context.Context, id int32) error
 	AddCarrierRegion(ctx context.Context, arg AddCarrierRegionParams) error
+	AddNewsInterest(ctx context.Context, arg AddNewsInterestParams) error
 	AddUserInterest(ctx context.Context, arg AddUserInterestParams) error
+	AdminCountNews(ctx context.Context, status string) (int64, error)
+	AdminListNews(ctx context.Context, arg AdminListNewsParams) ([]News, error)
 	AnalyticsActiveSubscriptionsByTier(ctx context.Context) ([]AnalyticsActiveSubscriptionsByTierRow, error)
 	AnalyticsCountActiveSessions(ctx context.Context) (int64, error)
 	AnalyticsCountBidsByDay(ctx context.Context, arg AnalyticsCountBidsByDayParams) ([]AnalyticsCountBidsByDayRow, error)
@@ -51,6 +54,9 @@ type Querier interface {
 	CancelSellAuction(ctx context.Context, id int32) error
 	CheckOrderExistsForBuyRequestAndSupplier(ctx context.Context, arg CheckOrderExistsForBuyRequestAndSupplierParams) (bool, error)
 	CheckOrderExistsForSellAuction(ctx context.Context, sellAuctionID pgtype.Int4) (bool, error)
+	// Claims the notification for this story. Only one caller can win, so a double
+	// click on "publish" cannot notify members twice.
+	ClaimNewsNotification(ctx context.Context, id int32) (int32, error)
 	ClearUserOTP(ctx context.Context, id int32) error
 	CloseIssueIfOpen(ctx context.Context, publicID pgtype.UUID) (int32, error)
 	CompleteOrder(ctx context.Context, id int32) error
@@ -72,10 +78,13 @@ type Querier interface {
 	CountModeratableSellAuctions(ctx context.Context) (int64, error)
 	CountMonthlyBuyCancellations(ctx context.Context, ownerID int32) (int64, error)
 	CountMonthlySellCancellations(ctx context.Context, ownerID int32) (int64, error)
+	CountNewsViewers(ctx context.Context, arg CountNewsViewersParams) (int64, error)
+	CountNewsViewersByNews(ctx context.Context, newsIds []int32) ([]CountNewsViewersByNewsRow, error)
 	CountOpenIssuesByUser(ctx context.Context, userID int32) (int64, error)
 	CountOrdersByUser(ctx context.Context, sellerID int32) (int64, error)
 	CountPendingApprovalBuyRequests(ctx context.Context) (int64, error)
 	CountPendingApprovalSellAuctions(ctx context.Context) (int64, error)
+	CountPublishedNews(ctx context.Context) (int64, error)
 	CountQuotableBuyRequestsForCarrier(ctx context.Context, regionIds []int32) (int64, error)
 	CountQuotableOrdersForCarrier(ctx context.Context, regionIds []int32) (int64, error)
 	CountQuotableSellAuctionsForCarrier(ctx context.Context, regionIds []int32) (int64, error)
@@ -88,15 +97,20 @@ type Querier interface {
 	CountSellerBalances(ctx context.Context, overdueOnly bool) (int64, error)
 	CountShippingQuotesByCarrier(ctx context.Context, carrierID int32) (int64, error)
 	CountSupplyOffersByRequest(ctx context.Context, buyRequestID int32) (int64, error)
+	CountUnreadNews(ctx context.Context, userID int32) (int64, error)
 	CountUnreadNotifications(ctx context.Context, userID int32) (int64, error)
 	CountUserDocuments(ctx context.Context, userID int32) (int64, error)
 	CountUsersByStatus(ctx context.Context, status string) (int64, error)
+	// How many of the given members can actually receive a push right now.
+	CountUsersWithActiveDevice(ctx context.Context, userIds []int32) (int64, error)
 	CreateBuyRequest(ctx context.Context, arg CreateBuyRequestParams) (BuyRequest, error)
 	CreateCommissionCharge(ctx context.Context, arg CreateCommissionChargeParams) (CommissionCharge, error)
 	CreateCommissionInvoice(ctx context.Context, arg CreateCommissionInvoiceParams) (CommissionInvoice, error)
 	CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue, error)
 	CreateIssueReply(ctx context.Context, arg CreateIssueReplyParams) (IssueReply, error)
 	CreateLoginHistory(ctx context.Context, arg CreateLoginHistoryParams) error
+	// ------------------------------------------------------------------ admin
+	CreateNews(ctx context.Context, arg CreateNewsParams) (News, error)
 	CreateNotification(ctx context.Context, arg CreateNotificationParams) (Notification, error)
 	CreateOrderFromBuyRequest(ctx context.Context, arg CreateOrderFromBuyRequestParams) (Order, error)
 	// The region ids alongside the names: carrier job feeds (#14) scope by
@@ -116,7 +130,10 @@ type Querier interface {
 	CreateUserSubscription(ctx context.Context, arg CreateUserSubscriptionParams) (UserSubscription, error)
 	DeactivateAllUserSubscriptions(ctx context.Context, userID int32) error
 	DeactivateDeviceToken(ctx context.Context, token string) error
+	DeleteAppSetting(ctx context.Context, key string) error
 	DeleteExpiredSessions(ctx context.Context) error
+	DeleteNews(ctx context.Context, publicID pgtype.UUID) (int64, error)
+	DeleteNewsInterests(ctx context.Context, newsID int32) error
 	DeleteOldNotifications(ctx context.Context, arg DeleteOldNotificationsParams) error
 	DeleteUserInterests(ctx context.Context, userID int32) error
 	EnsureSeedUser(ctx context.Context, arg EnsureSeedUserParams) (User, error)
@@ -153,9 +170,11 @@ type Querier interface {
 	GetMissingDocumentTypes(ctx context.Context, userID int32) ([]interface{}, error)
 	GetMotivatableActiveBuyRequests(ctx context.Context) ([]BuyRequest, error)
 	GetMotivatableActiveSellAuctions(ctx context.Context) ([]SellAuction, error)
+	GetNewsByPublicID(ctx context.Context, publicID pgtype.UUID) (News, error)
 	GetOrderByID(ctx context.Context, id int32) (Order, error)
 	GetOrderByPublicID(ctx context.Context, publicID pgtype.UUID) (Order, error)
 	GetOrdersPendingConfirmation(ctx context.Context) ([]Order, error)
+	GetPublishedNews(ctx context.Context, publicID pgtype.UUID) (News, error)
 	GetReferralCodeByCode(ctx context.Context, code string) (ReferralCode, error)
 	GetReferralCodeByUser(ctx context.Context, userID int32) (ReferralCode, error)
 	GetRegionByID(ctx context.Context, id int32) (Region, error)
@@ -208,13 +227,20 @@ type Querier interface {
 	IncrementReferralUsage(ctx context.Context, id int32) error
 	IncrementRequestCount(ctx context.Context, id int32) error
 	IncrementSellAuctionBidCount(ctx context.Context, id int32) error
+	// ------------------------------------------------------------- analytics
+	// Two unnests in the select list are zipped row by row, so user_ids[i] gets
+	// was_pro[i]. The arrays are always built together and are the same length.
+	InsertNewsDeliveries(ctx context.Context, arg InsertNewsDeliveriesParams) error
 	// After a successful reset, retire every other outstanding code for the user.
 	InvalidatePasswordResetCodes(ctx context.Context, userID int32) error
 	InvalidateSession(ctx context.Context, id int32) error
 	InvalidateUserSessions(ctx context.Context, userID int32) error
+	// --------------------------------------------------------------- members
+	IsProUser(ctx context.Context, userID int32) (bool, error)
 	LazyRestoreExpiredSuspension(ctx context.Context, id int32) (int64, error)
 	ListAcceptedOffersByRequest(ctx context.Context, buyRequestID int32) ([]SupplyOffer, error)
 	ListActiveBuyRequests(ctx context.Context, arg ListActiveBuyRequestsParams) ([]BuyRequest, error)
+	ListActiveInterestsByIDs(ctx context.Context, ids []int32) ([]Interest, error)
 	ListActiveSellAuctions(ctx context.Context, arg ListActiveSellAuctionsParams) ([]SellAuction, error)
 	ListAllIssues(ctx context.Context, arg ListAllIssuesParams) ([]Issue, error)
 	ListAllUsersAnyStatus(ctx context.Context, arg ListAllUsersAnyStatusParams) ([]User, error)
@@ -255,12 +281,20 @@ type Querier interface {
 	ListModeratableBuyRequests(ctx context.Context, arg ListModeratableBuyRequestsParams) ([]BuyRequest, error)
 	// Live and suspended posts, for the admin's "published" tab.
 	ListModeratableSellAuctions(ctx context.Context, arg ListModeratableSellAuctionsParams) ([]SellAuction, error)
+	ListNewsInterests(ctx context.Context, newsIds []int32) ([]ListNewsInterestsRow, error)
+	// Members to notify about a story: every active member, Pro or not — a
+	// non-Pro member who taps it is shown the story's teaser and an upgrade
+	// prompt. by_interest narrows it to members who share one of the story's
+	// interests. Carriers and admins are not the audience.
+	ListNewsRecipients(ctx context.Context, arg ListNewsRecipientsParams) ([]ListNewsRecipientsRow, error)
+	ListNewsViewers(ctx context.Context, arg ListNewsViewersParams) ([]ListNewsViewersRow, error)
 	ListNotificationsByUser(ctx context.Context, arg ListNotificationsByUserParams) ([]Notification, error)
 	ListOrdersByBuyRequest(ctx context.Context, buyRequestID pgtype.Int4) ([]Order, error)
 	ListOrdersBySellAuction(ctx context.Context, sellAuctionID pgtype.Int4) ([]Order, error)
 	ListOrdersByUser(ctx context.Context, arg ListOrdersByUserParams) ([]Order, error)
 	ListPendingApprovalBuyRequests(ctx context.Context, arg ListPendingApprovalBuyRequestsParams) ([]BuyRequest, error)
 	ListPendingApprovalSellAuctions(ctx context.Context, arg ListPendingApprovalSellAuctionsParams) ([]SellAuction, error)
+	ListPublishedNews(ctx context.Context, arg ListPublishedNewsParams) ([]ListPublishedNewsRow, error)
 	ListQuotableBuyRequestsForCarrier(ctx context.Context, arg ListQuotableBuyRequestsForCarrierParams) ([]ListQuotableBuyRequestsForCarrierRow, error)
 	// Carrier-facing job feeds.
 	//
@@ -302,6 +336,10 @@ type Querier interface {
 	// payment record.
 	MarkInvoicePaid(ctx context.Context, arg MarkInvoicePaidParams) (int64, error)
 	MarkInvoiceReminded(ctx context.Context, id int32) error
+	MarkNewsDelivered(ctx context.Context, arg MarkNewsDeliveredParams) error
+	MarkNewsReadToEnd(ctx context.Context, arg MarkNewsReadToEndParams) (int64, error)
+	MarkNewsSeen(ctx context.Context, userID int32) error
+	MarkNewsUpgradeClicked(ctx context.Context, arg MarkNewsUpgradeClickedParams) (int64, error)
 	MarkNotChosenSellBids(ctx context.Context, auctionID int32) error
 	MarkNotChosenSupplyOffers(ctx context.Context, buyRequestID int32) error
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) error
@@ -310,7 +348,17 @@ type Querier interface {
 	MarkSellAuctionMotivated(ctx context.Context, id int32) error
 	MarkSellAuctionNotified(ctx context.Context, id int32) error
 	MarkSellAuctionSelectionWarned(ctx context.Context, id int32) error
+	NewsDeliveryStats(ctx context.Context, newsID int32) (NewsDeliveryStatsRow, error)
+	// "Pro" below means read it and never hit the prompt; "free" means hit the
+	// prompt, whether or not they upgraded afterwards (converted).
+	NewsViewStats(ctx context.Context, newsID int32) (NewsViewStatsRow, error)
+	// First publish stamps published_at; publishing again after an unpublish keeps
+	// the original date so the story does not jump back to the top of the list.
+	PublishNews(ctx context.Context, publicID pgtype.UUID) (News, error)
 	ReactivateUserSubscription(ctx context.Context, arg ReactivateUserSubscriptionParams) (UserSubscription, error)
+	// Flags only ever turn on: a member who opened from the push once stays
+	// counted as a push open however they come back.
+	RecordNewsView(ctx context.Context, arg RecordNewsViewParams) error
 	RejectBuyRequest(ctx context.Context, arg RejectBuyRequestParams) (BuyRequest, error)
 	RejectSellAuction(ctx context.Context, arg RejectSellAuctionParams) (SellAuction, error)
 	RejectShippingQuote(ctx context.Context, id int32) (ShippingQuote, error)
@@ -329,6 +377,7 @@ type Querier interface {
 	SearchUsersCount(ctx context.Context, arg SearchUsersCountParams) (int64, error)
 	SelectSellBid(ctx context.Context, id int32) error
 	SelectSellWinner(ctx context.Context, arg SelectSellWinnerParams) error
+	SetNewsNotifiedCount(ctx context.Context, arg SetNewsNotifiedCountParams) error
 	// Whether a supply-side merchant is willing to sell to retailers (#7). Kept as
 	// its own statement rather than folded into UpdateUserProfileWithNames: that one
 	// is called with a full profile payload, and a bool absent from such a payload
@@ -339,10 +388,12 @@ type Querier interface {
 	SuspendSellAuction(ctx context.Context, arg SuspendSellAuctionParams) (SellAuction, error)
 	SuspendUser(ctx context.Context, arg SuspendUserParams) (int64, error)
 	UnbanUser(ctx context.Context, arg UnbanUserParams) (int64, error)
+	UnpublishNews(ctx context.Context, publicID pgtype.UUID) (News, error)
 	UnsuspendUser(ctx context.Context, arg UnsuspendUserParams) (int64, error)
 	UpdateBuyRequestFulfilledQuantity(ctx context.Context, arg UpdateBuyRequestFulfilledQuantityParams) error
 	UpdateBuyRequestStatus(ctx context.Context, arg UpdateBuyRequestStatusParams) error
 	UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusParams) error
+	UpdateNews(ctx context.Context, arg UpdateNewsParams) (News, error)
 	UpdateSellAuctionStatus(ctx context.Context, arg UpdateSellAuctionStatusParams) error
 	UpdateSessionLastUsed(ctx context.Context, id int32) error
 	UpdateUserCachedNames(ctx context.Context, arg UpdateUserCachedNamesParams) error

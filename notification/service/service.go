@@ -78,19 +78,43 @@ func (s *NotificationService) SendToUser(ctx context.Context, userID int32, titl
 	go s.sendPushNotification(context.WithoutCancel(ctx), userID, title, body, data)
 }
 
-func (s *NotificationService) sendPushNotification(ctx context.Context, userID int32, title, body string, data map[string]string) {
+// SendPushOnly delivers a push without adding it to the member's in-app
+// notification list, waits for it to be sent, and reports whether FCM accepted
+// it for at least one of the member's devices. News uses it: the list holds
+// only the latest few notifications per member, and a story should not push
+// out an alert about one of their own deals. The ban/suspension gate still
+// applies.
+func (s *NotificationService) SendPushOnly(ctx context.Context, userID int32, title, body string, data map[string]string) bool {
+	user, err := s.queries.GetUserStatusByID(ctx, userID)
+	if err != nil {
+		slog.Error("failed to get user status for push", "error", err, "user_id", userID)
+		return false
+	}
+	if user.Status == "suspended" || user.Status == "banned" {
+		return false
+	}
+	return s.sendPushNotification(ctx, userID, title, body, data) > 0
+}
+
+// PushEnabled reports whether this server can send pushes at all.
+func (s *NotificationService) PushEnabled() bool {
+	return s.firebase.Enabled()
+}
+
+// sendPushNotification returns how many of the member's devices FCM accepted.
+func (s *NotificationService) sendPushNotification(ctx context.Context, userID int32, title, body string, data map[string]string) int {
 	if s.firebase == nil {
-		return
+		return 0
 	}
 
 	tokens, err := s.queries.GetActiveDeviceTokensByUser(ctx, userID)
 	if err != nil {
 		slog.Error("failed to get device tokens", "error", err, "user_id", userID)
-		return
+		return 0
 	}
 
 	if len(tokens) == 0 {
-		return
+		return 0
 	}
 
 	tokenStrings := make([]string, len(tokens))
@@ -103,24 +127,26 @@ func (s *NotificationService) sendPushNotification(ctx context.Context, userID i
 	response, err := s.firebase.SendMulticast(ctx, tokenStrings, title, body, data)
 	if err != nil {
 		slog.Error("failed to send multicast notification", "error", err, "user_id", userID)
-		return
+		return 0
+	}
+	if response == nil {
+		return 0
 	}
 
-	if response != nil {
-		for i, resp := range response.Responses {
-			if !resp.Success && resp.Error != nil {
-				errMsg := resp.Error.Error()
-				slog.Info("sendPushNotification: token response", "user_id", userID, "success", false, "error", errMsg)
-				if messaging.IsUnregistered(resp.Error) || messaging.IsInvalidArgument(resp.Error) {
-					if err := s.queries.DeactivateDeviceToken(ctx, tokenStrings[i]); err != nil {
-						slog.Error("failed to deactivate invalid token", "error", err, "token", tokenStrings[i])
-					} else {
-						slog.Info("sendPushNotification: deactivated token", "user_id", userID, "reason", errMsg)
-					}
+	for i, resp := range response.Responses {
+		if !resp.Success && resp.Error != nil {
+			errMsg := resp.Error.Error()
+			slog.Info("sendPushNotification: token response", "user_id", userID, "success", false, "error", errMsg)
+			if messaging.IsUnregistered(resp.Error) || messaging.IsInvalidArgument(resp.Error) {
+				if err := s.queries.DeactivateDeviceToken(ctx, tokenStrings[i]); err != nil {
+					slog.Error("failed to deactivate invalid token", "error", err, "token", tokenStrings[i])
+				} else {
+					slog.Info("sendPushNotification: deactivated token", "user_id", userID, "reason", errMsg)
 				}
 			}
 		}
 	}
+	return response.SuccessCount
 }
 
 func (s *NotificationService) Send(ctx context.Context, userID int32, event model.EventType, data map[string]string) {

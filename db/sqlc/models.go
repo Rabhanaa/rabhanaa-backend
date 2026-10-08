@@ -160,6 +160,61 @@ type LoginHistory struct {
 	Success    bool               `json:"success"`
 }
 
+type News struct {
+	ID                int32              `json:"id"`
+	PublicID          pgtype.UUID        `json:"public_id"`
+	Title             string             `json:"title"`
+	Summary           string             `json:"summary"`
+	BodyHtml          string             `json:"body_html"`
+	CoverImageUrl     pgtype.Text        `json:"cover_image_url"`
+	SourceUrl         pgtype.Text        `json:"source_url"`
+	SourceName        pgtype.Text        `json:"source_name"`
+	SourceText        pgtype.Text        `json:"source_text"`
+	Status            string             `json:"status"`
+	AiProvider        pgtype.Text        `json:"ai_provider"`
+	AiModel           pgtype.Text        `json:"ai_model"`
+	CreatedByAdminID  pgtype.Int4        `json:"created_by_admin_id"`
+	PublishedAt       pgtype.Timestamptz `json:"published_at"`
+	NotifiedAt        pgtype.Timestamptz `json:"notified_at"`
+	NotifiedCount     int32              `json:"notified_count"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	SourceImages      []byte             `json:"source_images"`
+	NotificationTitle string             `json:"notification_title"`
+	NotificationBody  string             `json:"notification_body"`
+}
+
+type NewsDelivery struct {
+	NewsID    int32              `json:"news_id"`
+	UserID    int32              `json:"user_id"`
+	WasPro    bool               `json:"was_pro"`
+	SentAt    pgtype.Timestamptz `json:"sent_at"`
+	Delivered bool               `json:"delivered"`
+}
+
+type NewsInterest struct {
+	NewsID     int32 `json:"news_id"`
+	InterestID int32 `json:"interest_id"`
+}
+
+type NewsSeen struct {
+	UserID     int32              `json:"user_id"`
+	LastSeenAt pgtype.Timestamptz `json:"last_seen_at"`
+}
+
+type NewsView struct {
+	NewsID         int32              `json:"news_id"`
+	UserID         int32              `json:"user_id"`
+	FromPush       bool               `json:"from_push"`
+	ReadAsPro      bool               `json:"read_as_pro"`
+	Gated          bool               `json:"gated"`
+	ReadToEnd      bool               `json:"read_to_end"`
+	UpgradeClicked bool               `json:"upgrade_clicked"`
+	ViewCount      int32              `json:"view_count"`
+	FirstViewedAt  pgtype.Timestamptz `json:"first_viewed_at"`
+	LastViewedAt   pgtype.Timestamptz `json:"last_viewed_at"`
+}
+
 type Notification struct {
 	ID        int32              `json:"id"`
 	UserID    int32              `json:"user_id"`

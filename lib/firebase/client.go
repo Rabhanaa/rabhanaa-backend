@@ -21,6 +21,12 @@ type Client struct {
 // credentialsJSON: raw JSON content of the service account (used when FIREBASE_CREDENTIALS_JSON is set).
 // baseURL: the app's public HTTPS base URL used to build deep-link URLs in WebpushFCMOptions.
 // If both credentials are empty, returns a disabled client (push notifications silently skipped).
+// Enabled reports whether credentials were configured, i.e. whether a push can
+// actually be sent.
+func (c *Client) Enabled() bool {
+	return c != nil && c.enabled
+}
+
 func NewClient(ctx context.Context, credentialsFile, credentialsJSON, baseURL string) (*Client, error) {
 	var opt option.ClientOption
 	switch {
@@ -66,6 +72,11 @@ func (c *Client) buildLink(data map[string]string) string {
 		}
 		if id := data["request_id"]; id != "" {
 			return c.baseURL + "/auctions/buy/" + id
+		}
+	case "news_published":
+		// src=push is how a tap is counted in the story's analytics.
+		if id := data["news_id"]; id != "" {
+			return c.baseURL + "/news/" + id + "?src=push"
 		}
 	// Shipping quotes (#14). Only the merchant owns the deal, so only the
 	// merchant is sent to it.

@@ -38,6 +38,23 @@ var (
 	ErrQuoteStageDisabled     = errors.New("QUOTE_STAGE_DISABLED")
 	ErrUnknownSetting         = errors.New("UNKNOWN_SETTING")
 	ErrInvalidSettingValue    = errors.New("INVALID_SETTING_VALUE")
+	ErrSecretsUnavailable     = errors.New("SECRETS_UNAVAILABLE")
+
+	// News.
+	ErrNewsNotFound      = errors.New("NEWS_NOT_FOUND")
+	ErrProRequired       = errors.New("PRO_REQUIRED")
+	ErrNewsTitleRequired = errors.New("NEWS_TITLE_REQUIRED")
+	ErrNewsBodyRequired  = errors.New("NEWS_BODY_REQUIRED")
+	ErrNewsTooLarge      = errors.New("NEWS_TOO_LARGE")
+	ErrInvalidNewsURL    = errors.New("INVALID_NEWS_URL")
+	ErrSourceFetchFailed = errors.New("SOURCE_FETCH_FAILED")
+	ErrSourceTooShort    = errors.New("SOURCE_TOO_SHORT")
+	ErrAINotConfigured   = errors.New("AI_NOT_CONFIGURED")
+	ErrAIRequestFailed   = errors.New("AI_REQUEST_FAILED")
+	ErrInvalidAIProvider = errors.New("INVALID_AI_PROVIDER")
+	ErrPushUnavailable   = errors.New("PUSH_UNAVAILABLE")
+	ErrNoTestDevice      = errors.New("NO_TEST_DEVICE")
+	ErrTestPushFailed    = errors.New("TEST_PUSH_FAILED")
 )
 
 var (
@@ -132,6 +149,21 @@ var ArabicMessages = map[string]string{
 	"QUOTE_STAGE_DISABLED":        "تقديم عروض الشحن غير متاح في هذه المرحلة",
 	"UNKNOWN_SETTING":             "إعداد غير معروف",
 	"INVALID_SETTING_VALUE":       "قيمة الإعداد غير صحيحة",
+	"SECRETS_UNAVAILABLE":         "حفظ المفاتيح غير مفعّل على الخادم — يجب إضافة SETTINGS_ENCRYPTION_KEY أولًا",
+	"NEWS_NOT_FOUND":              "الخبر غير موجود",
+	"PRO_REQUIRED":                "الأخبار متاحة لمشتركي برو فقط",
+	"NEWS_TITLE_REQUIRED":         "عنوان الخبر مطلوب",
+	"NEWS_BODY_REQUIRED":          "أضف نص الخبر قبل النشر",
+	"NEWS_TOO_LARGE":              "نص الخبر كبير جدًا",
+	"INVALID_NEWS_URL":            "الرابط غير صحيح — استخدم رابط صفحة الخبر كاملًا (https://...)",
+	"SOURCE_FETCH_FAILED":         "تعذر قراءة الخبر من هذا الرابط — يمكنك لصق نص الخبر يدويًا",
+	"SOURCE_TOO_SHORT":            "نص المصدر قصير جدًا لكتابة خبر منه",
+	"AI_NOT_CONFIGURED":           "أضف مفتاح API واختر الموديل لهذا المزود من الإعدادات أولًا",
+	"AI_REQUEST_FAILED":           "تعذر توليد الخبر بالذكاء الاصطناعي",
+	"INVALID_AI_PROVIDER":         "مزود الذكاء الاصطناعي غير معروف",
+	"PUSH_UNAVAILABLE":            "خدمة الإشعارات (Firebase) غير مفعّلة على هذا الخادم",
+	"NO_TEST_DEVICE":              "لا يوجد جهاز مفعّل عليه الإشعارات لحسابك. افتح تطبيق ربحانة على هاتفك بحسابك هذا، واسمح بالإشعارات، ثم حاول مرة أخرى",
+	"TEST_PUSH_FAILED":            "رفضت خدمة الإشعارات الإرسال لجهازك — افتح التطبيق على هاتفك لتحديث تسجيل الجهاز ثم حاول مرة أخرى",
 	"INVALID_RESET_CODE":          "الرمز غير صحيح",
 	"RESET_CODE_EXPIRED":          "انتهت صلاحية الرمز — اطلب رمزاً جديداً",
 	"INVALID_PASSWORD":            "كلمة المرور يجب أن تكون 8-16 حرفاً وتحتوي على حرف كبير وصغير ورقم ورمز",

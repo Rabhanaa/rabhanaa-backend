@@ -11,6 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteAppSetting = `-- name: DeleteAppSetting :exec
+DELETE FROM app_settings WHERE key = $1
+`
+
+func (q *Queries) DeleteAppSetting(ctx context.Context, key string) error {
+	_, err := q.db.Exec(ctx, deleteAppSetting, key)
+	return err
+}
+
 const getAppSetting = `-- name: GetAppSetting :one
 SELECT key, value, updated_at, updated_by_admin_id FROM app_settings WHERE key = $1
 `

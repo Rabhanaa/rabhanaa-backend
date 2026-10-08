@@ -33,13 +33,60 @@ func (h *AdminSettingsHandler) List(c *gin.Context) {
 				service.StageOrder, service.StagePost, service.StageBoth,
 			},
 			service.KeyCommissionWeekCloseDay: service.CommissionWeekDays,
+			service.KeyAIProvider:             service.AIProviders,
+			service.KeyNewsNotifyMode:         service.NewsNotifyModes,
 		},
+		// API keys are never sent back, only whether one is set and its last
+		// four characters.
+		"secrets":           h.settings.SecretHints(),
+		"secrets_available": h.settings.SecretsAvailable(),
 	})
 }
 
 type updateSettingRequest struct {
 	Key   string `json:"key" binding:"required"`
 	Value string `json:"value" binding:"required"`
+}
+
+type updateSecretRequest struct {
+	Key   string `json:"key" binding:"required"`
+	Value string `json:"value" binding:"required"`
+}
+
+// UpdateSecret stores an API key, encrypted. Write-only: the response carries
+// the masked hints, never the value.
+func (h *AdminSettingsHandler) UpdateSecret(c *gin.Context) {
+	var req updateSecretRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		settingsError(c, service.ErrInvalidSettingValue)
+		return
+	}
+	if err := h.settings.SetSecret(c.Request.Context(), req.Key, req.Value, int32(c.GetInt("userID"))); err != nil {
+		settingsError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"secrets": h.settings.SecretHints()})
+}
+
+func (h *AdminSettingsHandler) ClearSecret(c *gin.Context) {
+	if err := h.settings.ClearSecret(c.Request.Context(), c.Param("key"), int32(c.GetInt("userID"))); err != nil {
+		settingsError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"secrets": h.settings.SecretHints()})
+}
+
+func settingsError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, service.ErrUnknownSetting):
+		c.JSON(http.StatusBadRequest, gin.H{"error": errs.ErrUnknownSetting.Error(), "message": errs.GetArabicMessage(errs.ErrUnknownSetting)})
+	case errors.Is(err, service.ErrInvalidSettingValue):
+		c.JSON(http.StatusBadRequest, gin.H{"error": errs.ErrInvalidSettingValue.Error(), "message": errs.GetArabicMessage(errs.ErrInvalidSettingValue)})
+	case errors.Is(err, service.ErrSecretsUnavailable):
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": errs.ErrSecretsUnavailable.Error(), "message": errs.GetArabicMessage(errs.ErrSecretsUnavailable)})
+	default:
+		handleError(c, err)
+	}
 }
 
 func (h *AdminSettingsHandler) Update(c *gin.Context) {

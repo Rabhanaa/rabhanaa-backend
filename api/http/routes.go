@@ -87,6 +87,17 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	protected.GET("/commissions/summary", middleware.NotCarrier(), commissionHandler.Summary)
 	protected.GET("/commissions/charges", middleware.NotCarrier(), commissionHandler.ListMyCharges)
 
+	// News. Every member is notified; Pro members read, others get a teaser
+	// and an upgrade prompt. Status drives the profile badge; the list is Pro
+	// only; a single story answers non-Pro members with its teaser.
+	newsHandler := NewNewsHandler(ctx.NewsService)
+	protected.GET("/news/status", middleware.NotCarrier(), newsHandler.Status)
+	protected.GET("/news", middleware.NotCarrier(), newsHandler.List)
+	protected.POST("/news/seen", middleware.NotCarrier(), newsHandler.MarkSeen)
+	protected.GET("/news/:id", middleware.NotCarrier(), newsHandler.Get)
+	protected.POST("/news/:id/read", middleware.NotCarrier(), newsHandler.ReadToEnd)
+	protected.POST("/news/:id/upgrade-click", middleware.NotCarrier(), newsHandler.UpgradeClicked)
+
 	// Auction routes
 	sellHandler := NewSellAuctionHandler(ctx.SellAuctionService)
 	protected.POST("/sell-auctions", middleware.NotCarrier(), sellHandler.Create)
@@ -232,6 +243,26 @@ func RegisterRoutes(router *gin.Engine, ctx *appctx.AppContext) {
 	settingsHandler := NewAdminSettingsHandler(ctx.SettingsService)
 	adminGroup.GET("/settings", settingsHandler.List)
 	adminGroup.PATCH("/settings", settingsHandler.Update)
+	adminGroup.POST("/settings/secrets", settingsHandler.UpdateSecret)
+	adminGroup.DELETE("/settings/secrets/:key", settingsHandler.ClearSecret)
+
+	// News. Admins write and publish; AI drafts from a source link.
+	adminGroup.GET("/news", newsHandler.AdminList)
+	adminGroup.POST("/news", newsHandler.AdminCreate)
+	adminGroup.POST("/news/extract", newsHandler.AdminExtract)
+	adminGroup.POST("/news/generate", newsHandler.AdminGenerate)
+	adminGroup.POST("/news/notification-text", newsHandler.AdminNotificationText)
+	adminGroup.GET("/news/:id", newsHandler.AdminGet)
+	adminGroup.PATCH("/news/:id", newsHandler.AdminUpdate)
+	adminGroup.DELETE("/news/:id", newsHandler.AdminDelete)
+	adminGroup.GET("/news/:id/audience", newsHandler.AdminAudience)
+	adminGroup.POST("/news/:id/publish", newsHandler.AdminPublish)
+	adminGroup.POST("/news/:id/unpublish", newsHandler.AdminUnpublish)
+	adminGroup.GET("/news/:id/analytics", newsHandler.AdminAnalytics)
+	adminGroup.POST("/news/:id/test-notification", newsHandler.AdminTestNotification)
+	adminGroup.GET("/news/:id/viewers", newsHandler.AdminViewers)
+	adminGroup.GET("/ai/models", newsHandler.AdminAIModels)
+	adminGroup.POST("/ai/test", newsHandler.AdminAITest)
 
 	analyticsHandler := NewAdminAnalyticsHandler(ctx.AnalyticsService)
 	adminGroup.GET("/analytics/overview", analyticsHandler.Overview)
