@@ -57,6 +57,11 @@ type Querier interface {
 	// Claims the notification for this story. Only one caller can win, so a double
 	// click on "publish" cannot notify members twice.
 	ClaimNewsNotification(ctx context.Context, id int32) (int32, error)
+	// Takes one of a member's demo-notification slots for today, if one is free:
+	// fewer than daily_max sent today, and the last one at least min_gap_minutes
+	// ago. Returns the member's id when the slot was taken, no row when it was not.
+	// A new Cairo day starts the count again.
+	ClaimSeedNotification(ctx context.Context, arg ClaimSeedNotificationParams) (int32, error)
 	ClearUserOTP(ctx context.Context, id int32) error
 	CloseIssueIfOpen(ctx context.Context, publicID pgtype.UUID) (int32, error)
 	CompleteOrder(ctx context.Context, id int32) error

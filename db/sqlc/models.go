@@ -301,6 +301,13 @@ type Region struct {
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
+type SeedNotificationQuotum struct {
+	UserID     int32              `json:"user_id"`
+	Day        pgtype.Date        `json:"day"`
+	SentToday  int32              `json:"sent_today"`
+	LastSentAt pgtype.Timestamptz `json:"last_sent_at"`
+}
+
 type SellAuction struct {
 	ID                     int32              `json:"id"`
 	PublicID               pgtype.UUID        `json:"public_id"`

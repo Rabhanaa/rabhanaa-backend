@@ -63,12 +63,24 @@ var seedProductTitles = []string{
 	"كبدة كوينشين",
 }
 
+// The seeder posts one demo listing at a time, a random three to nine minutes
+// apart — about ten an hour — alternating sell and buy. It used to post sixty
+// at once every hour (and again on every restart), which reached members'
+// phones as a burst of notifications.
+const (
+	seedMinGap = 3 * time.Minute
+	seedMaxGap = 9 * time.Minute
+)
+
 type SeedService struct {
 	queries              *sqlc.Queries
 	auctionDurationHours int
 	defaultImageURL      string
-	lastSeeded           time.Time
-	mu                   sync.Mutex
+	// When the next demo listing is due. Zero after a restart, so one post
+	// goes out straight away — one, not a batch.
+	nextSeedAt time.Time
+	nextIsBuy  bool
+	mu         sync.Mutex
 }
 
 func NewSeedService(queries *sqlc.Queries, auctionDurationHours int, defaultImageURL string) *SeedService {
@@ -93,12 +105,14 @@ func (s *SeedService) ensureSeedUser(ctx context.Context) (sqlc.User, error) {
 	})
 }
 
+// SeedAuctions posts the next demo listing when one is due. Called every
+// minute by the cron.
 func (s *SeedService) SeedAuctions(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Only seed once per hour
-	if time.Since(s.lastSeeded) < time.Hour {
+	now := time.Now()
+	if now.Before(s.nextSeedAt) {
 		return nil
 	}
 
@@ -107,11 +121,6 @@ func (s *SeedService) SeedAuctions(ctx context.Context) error {
 		slog.Error("failed to list interests for seeding", "error", err)
 		return nil
 	}
-	if len(interests) == 0 {
-		slog.Warn("no active interests found, skipping seed")
-		return nil
-	}
-
 	var meatInterest, poultryInterest *sqlc.Interest
 	for i := range interests {
 		switch interests[i].ID {
@@ -145,22 +154,42 @@ func (s *SeedService) SeedAuctions(ctx context.Context) error {
 		return nil
 	}
 
-	now := time.Now()
-	endTime := now.Add(time.Duration(s.auctionDurationHours) * time.Hour)
-	endTimePg := pgtype.Timestamptz{Time: endTime, Valid: true}
+	// Scheduled before posting, so a failing insert waits for the next slot
+	// rather than retrying every minute.
+	s.nextSeedAt = now.Add(seedMinGap + time.Duration(rand.Int63n(int64(seedMaxGap-seedMinGap))))
+	isBuy := s.nextIsBuy
+	s.nextIsBuy = !s.nextIsBuy
 
-	// Create 30 sell auctions
-	for i := 0; i < 30; i++ {
-		region := regions[rand.Intn(len(regions))]
-		title := seedProductTitles[rand.Intn(len(seedProductTitles))]
-		interest := meatInterest
-		if title == seedPoultryTitle {
-			interest = poultryInterest
-		}
+	region := regions[rand.Intn(len(regions))]
+	title := seedProductTitles[rand.Intn(len(seedProductTitles))]
+	interest := meatInterest
+	if title == seedPoultryTitle {
+		interest = poultryInterest
+	}
+	quantity := decimal.NewFromFloat(float64(rand.Intn(900) + 100))
+	endTimePg := pgtype.Timestamptz{Time: now.Add(time.Duration(s.auctionDurationHours) * time.Hour), Valid: true}
+
+	if isBuy {
+		_, err = s.queries.CreateBuyRequest(ctx, sqlc.CreateBuyRequestParams{
+			OwnerID:       seedUser.ID,
+			RegionID:      region.ID,
+			InterestID:    interest.ID,
+			Title:         title,
+			Description:   pgtype.Text{Valid: false},
+			ImageUrl:      s.defaultImageURL,
+			Unit:          seedUnit,
+			Quantity:      decimalToNumeric(quantity),
+			BuyAllFromOne: false,
+			EndTime:       endTimePg,
+			OwnerName:     seedUser.Name,
+			RegionName:    region.NameAr,
+			InterestName:  interest.NameAr,
+			// Demo listings bypass moderation.
+			Status: "active",
+		})
+	} else {
 		unitPrice := decimal.NewFromFloat(float64(rand.Intn(48500)+1500) / 100.0)
-		quantity := decimal.NewFromFloat(float64(rand.Intn(900) + 100))
-
-		params := sqlc.CreateSellAuctionParams{
+		_, err = s.queries.CreateSellAuction(ctx, sqlc.CreateSellAuctionParams{
 			OwnerID:       seedUser.ID,
 			RegionID:      region.ID,
 			InterestID:    interest.ID,
@@ -175,52 +204,13 @@ func (s *SeedService) SeedAuctions(ctx context.Context) error {
 			OwnerName:     seedUser.Name,
 			RegionName:    region.NameAr,
 			InterestName:  interest.NameAr,
-			// Demo listings bypass moderation — 60 an hour would bury the queue.
+			// Demo listings bypass moderation.
 			Status: "active",
-		}
-
-		if _, err := s.queries.CreateSellAuction(ctx, params); err != nil {
-			slog.Error("failed to create seed sell auction", "error", err)
-			continue
-		}
+		})
 	}
-
-	// Create 30 buy requests
-	for i := 0; i < 30; i++ {
-		region := regions[rand.Intn(len(regions))]
-		title := seedProductTitles[rand.Intn(len(seedProductTitles))]
-		interest := meatInterest
-		if title == seedPoultryTitle {
-			interest = poultryInterest
-		}
-		quantity := decimal.NewFromFloat(float64(rand.Intn(900) + 100))
-
-		params := sqlc.CreateBuyRequestParams{
-			OwnerID:       seedUser.ID,
-			RegionID:      region.ID,
-			InterestID:    interest.ID,
-			Title:         title,
-			Description:   pgtype.Text{Valid: false},
-			ImageUrl:      s.defaultImageURL,
-			Unit:          seedUnit,
-			Quantity:      decimalToNumeric(quantity),
-			BuyAllFromOne: false,
-			EndTime:       endTimePg,
-			OwnerName:     seedUser.Name,
-			RegionName:    region.NameAr,
-			InterestName:  interest.NameAr,
-			// Demo listings bypass moderation — 60 an hour would bury the queue.
-			Status: "active",
-		}
-
-		if _, err := s.queries.CreateBuyRequest(ctx, params); err != nil {
-			slog.Error("failed to create seed buy request", "error", err)
-			continue
-		}
+	if err != nil {
+		slog.Error("failed to create seed listing", "buy", isBuy, "error", err)
 	}
-
-	s.lastSeeded = time.Now()
-	slog.Info("seed completed", "sell_auctions", 30, "buy_requests", 30, "interests", len(interests), "regions", len(regions))
 	return nil
 }
 

@@ -2,8 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"math/rand"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 
 	auctionRepo "rabhana/auction/repository"
 	authRepo "rabhana/auth/repository"
@@ -31,7 +36,24 @@ type CronService struct {
 	regionFilter       bool
 	ticker             *time.Ticker
 	done               chan bool
+
+	// The demo-data account, looked up on first use. 0 until found.
+	seedUserID int32
+	// Clock for the demo-notification rules; nil means time.Now. Tests set it.
+	now func() time.Time
 }
+
+// Demo (seed) posts may notify a member, but sparingly: in the daytime only,
+// at most seedNotifyDailyMax a day, and two to three hours apart — the gap is
+// drawn per member so they are not all pinged at the same moment.
+const (
+	seedNotifyTimezone   = "Africa/Cairo"
+	seedNotifyFromHour   = 9  // 9 AM
+	seedNotifyUntilHour  = 22 // 10 PM, exclusive
+	seedNotifyDailyMax   = 5
+	seedNotifyMinGapMins = 120
+	seedNotifyMaxGapMins = 180
+)
 
 func NewCronService(
 	sellRepo auctionRepo.SellAuctionRepository,
@@ -257,6 +279,12 @@ func (c *CronService) processMotivationalMessages(ctx context.Context) {
 		slog.Error("failed to get motivatable sell auctions", "error", err)
 	} else {
 		for _, auction := range sellAuctions {
+			if c.isSeedPost(ctx, auction.OwnerID) {
+				if err := c.queries.MarkSellAuctionMotivated(ctx, auction.ID); err != nil {
+					slog.Error("failed to mark sell auction motivated", "error", err, "auction_id", auction.ID)
+				}
+				continue
+			}
 			title, body := sellMotivation(auction.InterestName, auction.EndTime.Time)
 			users, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
 				InterestID:     auction.InterestID,
@@ -288,6 +316,12 @@ func (c *CronService) processMotivationalMessages(ctx context.Context) {
 		return
 	}
 	for _, request := range buyRequests {
+		if c.isSeedPost(ctx, request.OwnerID) {
+			if err := c.queries.MarkBuyRequestMotivated(ctx, request.ID); err != nil {
+				slog.Error("failed to mark buy request motivated", "error", err, "request_id", request.ID)
+			}
+			continue
+		}
 		title, body := buyMotivation(request.InterestName, request.EndTime.Time)
 		users, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
 			InterestID:     request.InterestID,
@@ -351,6 +385,7 @@ func (c *CronService) processNewListings(ctx context.Context) {
 	}
 
 	for _, auction := range auctions {
+		isSeed := c.isSeedPost(ctx, auction.OwnerID)
 		matchingUsers, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
 			InterestID:     auction.InterestID,
 			ExcludeUserID:  auction.OwnerID,
@@ -364,6 +399,9 @@ func (c *CronService) processNewListings(ctx context.Context) {
 		}
 
 		for _, userID := range matchingUsers {
+			if isSeed && !c.allowSeedNotification(ctx, userID) {
+				continue
+			}
 			c.notificationSender.SendToUser(ctx, userID, auction.InterestName+" - صفقة جديدة", auction.Title, map[string]string{
 				"type":       "new_sell_auction",
 				"auction_id": auction.PublicID.String(),
@@ -382,6 +420,7 @@ func (c *CronService) processNewListings(ctx context.Context) {
 	}
 
 	for _, request := range requests {
+		isSeed := c.isSeedPost(ctx, request.OwnerID)
 		matchingUsers, err := c.queries.GetActiveUsersByInterest(ctx, sqlc.GetActiveUsersByInterestParams{
 			InterestID:     request.InterestID,
 			ExcludeUserID:  request.OwnerID,
@@ -395,6 +434,9 @@ func (c *CronService) processNewListings(ctx context.Context) {
 		}
 
 		for _, userID := range matchingUsers {
+			if isSeed && !c.allowSeedNotification(ctx, userID) {
+				continue
+			}
 			c.notificationSender.SendToUser(ctx, userID, request.InterestName+" - طلب شراء جديد", request.Title, map[string]string{
 				"type":       "new_buy_request",
 				"request_id": request.PublicID.String(),
@@ -413,6 +455,60 @@ func (c *CronService) notifyRegion(postRegionID int32) int32 {
 		return postRegionID
 	}
 	return 0
+}
+
+// isSeedPost reports whether a post belongs to the demo-data seeder. Demo
+// posts are announced only within the limits of allowSeedNotification, and
+// never get "ending soon" reminders.
+func (c *CronService) isSeedPost(ctx context.Context, ownerID int32) bool {
+	if c.seedUserID == 0 {
+		seed, err := c.queries.GetUserByEmail(ctx, seedUserEmail)
+		if err != nil {
+			// No seed account means no seed posts. Looked up again next time,
+			// since the seeder creates the account on its first run.
+			if !errors.Is(err, pgx.ErrNoRows) {
+				slog.Error("failed to look up seed user", "error", err)
+			}
+			return false
+		}
+		c.seedUserID = seed.ID
+	}
+	return ownerID == c.seedUserID
+}
+
+// allowSeedNotification decides whether a member may be told about a demo
+// post now, and if so records it against their daily allowance. Fails closed:
+// on any error the member is not notified.
+func (c *CronService) allowSeedNotification(ctx context.Context, userID int32) bool {
+	loc, err := time.LoadLocation(seedNotifyTimezone)
+	if err != nil {
+		slog.Error("failed to load timezone for demo notifications", "error", err)
+		return false
+	}
+	now := time.Now()
+	if c.now != nil {
+		now = c.now()
+	}
+	local := now.In(loc)
+	if local.Hour() < seedNotifyFromHour || local.Hour() >= seedNotifyUntilHour {
+		return false
+	}
+	day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+	gap := seedNotifyMinGapMins + rand.Intn(seedNotifyMaxGapMins-seedNotifyMinGapMins+1)
+	_, err = c.queries.ClaimSeedNotification(ctx, sqlc.ClaimSeedNotificationParams{
+		UserID:        userID,
+		Day:           pgtype.Date{Time: day, Valid: true},
+		DailyMax:      seedNotifyDailyMax,
+		MinGapMinutes: int32(gap),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false
+	}
+	if err != nil {
+		slog.Error("failed to claim demo notification slot", "error", err, "user_id", userID)
+		return false
+	}
+	return true
 }
 
 // ownerIsSupplySide reports whether a post's owner is a role retailers can see.
